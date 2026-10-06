@@ -6,7 +6,7 @@
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
 </head>
 <body>
-<title>Predictor v0.9</title>
+<title>Predictor v1.1</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
 <style>
@@ -87,6 +87,17 @@ td.num,th.num{text-align:right}
 .zone.cur{border-color:var(--accent)}
 .ok-t{color:var(--ok)} .bad-t{color:var(--bad)}
 #etapesBox{display:flex;flex-direction:column;gap:4px}
+table.wrapt td{white-space:normal;vertical-align:top}
+.synthese{display:flex;flex-direction:column;gap:10px}
+.syn{border:1px solid var(--line);border-radius:4px;padding:10px 12px;display:flex;flex-direction:column;gap:4px;background:var(--bg)}
+.syn-tete{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between}
+.syn-lab{font-family:var(--font-data);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.syn p{margin:0;max-width:70ch}
+.syn>p:first-of-type{font-size:15.5px;line-height:1.5}
+button.lien{border:0;background:none;padding:0;color:var(--accent);text-decoration:underline;font-size:inherit;cursor:pointer}
+details.calc>summary{cursor:pointer;font-weight:600;padding:6px 0}
+details.calc[open]>summary{margin-bottom:8px}
+table.wrapt td.num{white-space:nowrap}
 .etape{display:flex;gap:8px;align-items:flex-start;font-family:var(--font-data);font-size:12px;min-width:0;overflow-wrap:anywhere}
 .etape .ic{flex:0 0 14px;height:14px;margin-top:1px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;line-height:1}
 .etape.ok{color:var(--ok)} .etape.ok .ic::before{content:"✓"}
@@ -98,6 +109,7 @@ td.num,th.num{text-align:right}
 .seg button{border:0;border-radius:0;border-right:1px solid var(--line);background:var(--panel)}
 .seg button:last-child{border-right:0}
 .seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg)}
+#btnCoucheDanger[aria-pressed="true"],#btnCoucheEvt[aria-pressed="true"],#btnCoucheDanger2[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
 body:has(#chargeur:not([hidden])) .wrap{padding-bottom:120px}
 #chargeur{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--panel);border-top:1px solid var(--accent);box-shadow:0 -4px 16px rgba(0,0,0,.25);padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:6px}
 #chargeur .ligne{display:flex;align-items:center;gap:10px;min-width:0}
@@ -126,7 +138,7 @@ details.rap .ia-out{margin-top:6px}
 
 <div class="wrap">
 <header>
-  <h1>PREDICTOR <small id="verTag">v0.9 · F.S.M Game House</small></h1>
+  <h1>PREDICTOR <small id="verTag">v1.1 · F.S.M Game House</small></h1>
   <div class="pills">
     <span class="pill" id="pillDb">Mémoire : …</span>
     <span class="pill" id="pillNet">Réseau direct : non testé</span>
@@ -143,11 +155,12 @@ details.rap .ia-out{margin-top:6px}
 <section id="secZone" aria-labelledby="hZone">
   <h2 id="hZone">1 · Collecte</h2>
   <div class="row">
-    <div class="field" style="flex:1;min-width:200px"><label for="inRecherche">Rechercher un lieu (ville, quartier, adresse, partout dans le monde)</label>
-      <input id="inRecherche" type="search" enterkeyhint="search" placeholder="ex. Clichy-la-Garenne, Lyon Part-Dieu, 10 rue de Rivoli Paris"></div>
-    <button id="btnRecherche">Rechercher</button>
+    <div class="field" style="flex:1;min-width:200px"><label for="inRecherche">Adresse précise ou lieu (partout dans le monde)</label>
+      <input id="inRecherche" type="search" enterkeyhint="go" autocomplete="street-address" placeholder="ex. 12 rue Martre, Clichy · Lyon Part-Dieu"></div>
+    <button class="primary" id="btnRecherche">Charger la zone</button>
   </div>
   <div id="resRecherche" class="zones"></div>
+  <p class="small muted" style="margin:0">Tape une adresse puis « Charger la zone » : Predictor la localise et télécharge automatiquement la carte autour (rayon ci-dessous), la météo et les données réelles. Si plusieurs lieux correspondent, choisis dans la liste.</p>
   <div class="row">
     <div class="field"><label for="selVille">Ville</label>
       <select id="selVille"></select></div>
@@ -192,10 +205,17 @@ details.rap .ia-out{margin-top:6px}
     <div class="seg" id="segFond"><button data-fond="plan" aria-pressed="true">Plan</button><button data-fond="satellite" aria-pressed="false">Satellite</button><button data-fond="mixte" aria-pressed="false">Mixte</button></div>
     <span class="small muted" id="fondInfo"></span>
   </div>
+  <div class="row" role="group" aria-label="Couches de la carte">
+    <button id="btnCoucheDanger" aria-pressed="false">Danger</button>
+    <button id="btnCoucheEvt" aria-pressed="false">Événements</button>
+    <button id="btnTousLieux">Afficher tous les lieux</button>
+    <button id="btnAucunLieu">Masquer les lieux</button>
+  </div>
   <div class="legend" id="legend"></div>
   <div class="canvas-box"><canvas id="cv" aria-label="Carte virtualisée de la zone"></canvas></div>
   <div class="row"><button id="zIn" aria-label="Zoomer">+</button><button id="zOut" aria-label="Dézoomer">−</button><button id="zFit">Recentrer</button><span class="small muted">Glisser pour se déplacer · pincer ou molette pour zoomer · toucher un point pour l'identifier</span></div>
   <div class="info" id="info">Aucune zone chargée. Prépare une collecte ou ouvre une zone en mémoire.</div>
+  <div class="small muted" id="legendeDanger" hidden>Couche danger : plus le rouge est intense, plus la probabilité relative d'incident est élevée. Losanges : événements Actu17 (rouge grave, orange moyen, jaune faible).</div>
 </section>
 
 <section aria-labelledby="hAna">
@@ -208,18 +228,26 @@ details.rap .ia-out{margin-top:6px}
   <div id="pred"><p class="empty">Les prédictions utilisent la carte (fréquentation) et la météo. Intègre au moins l'une des deux.</p></div>
 </section>
 
+<section aria-labelledby="hEvt">
+  <h2 id="hEvt">5 · Événements en cours (Actu17)</h2>
+  <div class="row"><button class="primary" id="btnActu">Charger l'actualité</button><span class="small muted">Lit le flux d'Actu17, classe chaque article (agression, vol, accident…), trouve son lieu et le place sur la carte.</span></div>
+  <div id="evt"><p class="empty">Aucun événement chargé.</p></div>
+</section>
+
 <section aria-labelledby="hMem">
-  <h2 id="hMem">5 · Mémoire en ligne</h2>
+  <h2 id="hMem">6 · Mémoire en ligne</h2>
   <div class="zones" id="zones"><p class="empty">Connexion à la mémoire…</p></div>
 </section>
 
 <section aria-labelledby="hIa">
-  <h2 id="hIa">6 · Claude · agent d'analyse</h2>
+  <h2 id="hIa">7 · Claude · agent d'analyse</h2>
   <p class="small muted" style="margin:0">Claude interroge directement les modules de Predictor (zone, lieux, fréquentation, météo, historique, mémoire, état technique) pour répondre. Il n'a pas accès au web : il travaille uniquement sur les données collectées. Chaque question utilise ton forfait Claude.</p>
   <div class="row" id="iaPresets">
     <button data-q="Fais le rapport technique complet de la zone active : volumes de données, qualité et couverture des données, services, réseau de voies, points faibles, fiabilité des prédictions.">Rapport technique de la zone</button>
     <button data-q="Quels services essentiels manquent ou sont rares dans la zone active, et où se situent les manques ?">Manques en services</button>
     <button data-q="Quels sont les meilleurs et les pires créneaux de la semaine pour circuler dans la zone, en tenant compte de la météo prévue ?">Créneaux de la semaine</button>
+    <button data-q="Quels sont les secteurs les plus dangereux de la zone active, le jour et la nuit, et pourquoi ? Appuie-toi sur les accidents, les événements récents et la délinquance de la commune.">Secteurs dangereux</button>
+    <button data-q="Fais le point sur les événements récents (Actu17) dans la zone active et autour : types, lieux, tendance, et ce qu'ils changent au niveau de risque.">Événements récents</button>
     <button data-q="Évalue la fiabilité des prédictions de la zone active : précision météo mesurée, précision du modèle type contre le modèle calé sur mesures, effet de la pluie, suivi des prévisions passées. Que faudrait-il pour l'améliorer ?">Fiabilité des prédictions</button>
     <button data-q="Fais un diagnostic technique de Predictor : état de la mémoire, du réseau, des droits, de l'appareil et erreurs récentes du journal.">Diagnostic du logiciel</button>
   </div>
@@ -231,7 +259,7 @@ details.rap .ia-out{margin-top:6px}
 </section>
 
 <section aria-labelledby="hLog">
-  <h2 id="hLog">7 · Journal</h2>
+  <h2 id="hLog">8 · Journal</h2>
   <div class="row"><button id="btnDiag">Envoyer l'état technique à Claude</button><span class="small muted">Enregistre l'état du logiciel dans la mémoire, lisible par Claude depuis vos conversations.</span></div>
   <div class="log" id="log" aria-live="polite"></div>
 </section>
@@ -240,7 +268,7 @@ details.rap .ia-out{margin-top:6px}
 <script>
 "use strict";
 /* ===================== Constantes ===================== */
-const VERSION = "0.9"; /* version unique du projet : incrémentée à chaque évolution */
+const VERSION = "1.1"; /* version unique du projet : incrémentée à chaque évolution */
 const VILLES = [
  ["Paris",48.8566,2.3522],["Lyon",45.7640,4.8357],["Marseille",43.2965,5.3698],["Toulouse",43.6047,1.4442],
  ["Nice",43.7102,7.2620],["Nantes",47.2184,-1.5536],["Strasbourg",48.5734,7.7521],["Montpellier",43.6108,3.8767],
@@ -319,7 +347,7 @@ const FIAB_METEO = [92,88,82,74,65,56,48];
 
 /* ===================== État ===================== */
 let db=null, peutEcrire=true, zone=null, lieux=[], rues=[], selection=null;
-const filtres = Object.fromEntries(FAM_KEYS.map(k=>[k,true]));
+const filtres = Object.fromEntries(FAM_KEYS.map(k=>[k,false])); /* carte sans icônes par défaut */
 const $ = id=>document.getElementById(id);
 const esc = s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const fmt = (n,d=0)=>Number(n).toLocaleString("fr-FR",{maximumFractionDigits:d,minimumFractionDigits:d});
@@ -642,6 +670,7 @@ function lireDonnees(texte){
   const t=texte.replace(/^﻿/,"").trim();
   if(t.startsWith("{")||t.startsWith("[")){ const j=JSON.parse(t); return j&&j.type==="FeatureCollection"?geojsonVersElements(j):j; }
   if(/^latitude,longitude/i.test(t)||/^time,/m.test(t)) return csvMeteoVersJson(t);
+  if(/^<\?xml|<rss\b/i.test(t)) return {rss:lireRSS(t)};
   throw new Error("format inconnu");
 }
 async function traiterImport(texte){
@@ -667,6 +696,10 @@ async function importerPBF(f){
 $("pbfStop").addEventListener("click",()=>pbfCtl?.abort());
 async function traiterJson(json,source){
   if(json&&json.predictorPaquet){ try{ await importerPaquet(json); }catch(e){ log("Paquet non importé : "+(e.message||e)+".","e"); } return; }
+  if(json&&Array.isArray(json.rss)){ const sig=chargeurDebut("Analyse du flux importé");
+    try{ etapeUI("actuloc","Analyse et localisation des articles…","cours"); const n=await analyserFlux(json.rss,sig,m=>etapeUI("actuloc",m,"cours"));
+      etapeUI("actuloc",`${n} article(s) analysé(s)`,"ok"); log(`Flux importé : ${json.rss.length} articles, ${n} nouveaux analysés.`,"o"); await sauverEvenements(); rendreEvenements(); toutAfficher(false); }
+    catch(e){ etapeUI("actuloc","Analyse : échec ("+(e.message||e)+")","err"); } finally{ chargeurFin(); } return; }
   const z=zoneCible(); if(!z) return;
   if(Array.isArray(json.elements)){
     let res; try{ res=integrerCarte(json,z); }catch(e){ log("Carte non intégrée : "+e.message+". Vérifie que le lien correspond à cette zone.","e"); return; }
@@ -779,28 +812,38 @@ $("chStop").addEventListener("click",()=>{ if(CH.ctl){ CH.ctl.abort(); log("Coll
 
 /* ===================== Recherche de lieu (géocodage) ===================== */
 let rechercheRes=[];
-async function rechercherLieu(){
-  const q=$("inRecherche").value.trim(), box=$("resRecherche"); if(q.length<2) return;
-  box.innerHTML='<p class="small muted"><span class="spin"></span> Recherche de « '+esc(q)+' »…</p>';
+async function rechercherLieu(auto=true){
+  const q=$("inRecherche").value.trim(), box=$("resRecherche"); if(q.length<2){ box.innerHTML='<p class="small muted">Tape une adresse ou un nom de lieu.</p>'; return; }
+  box.innerHTML='<p class="small muted"><span class="spin"></span> Localisation de « '+esc(q)+' »…</p>';
+  const adresse=/\d/.test(q)||/\b(rue|avenue|av\.|boulevard|bd|place|quai|chemin|allée|allee|impasse|route|cours|square)\b/i.test(q);
   let res=[];
-  try{ const j=await getJSON(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=8&language=fr&format=json`,15000);
-    res=(j.results||[]).map(x=>({nom:x.name,detail:[x.admin3,x.admin2,x.admin1,x.country].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).join(", "),lat:x.latitude,lon:x.longitude,pop:x.population||0})); }catch(e){}
-  if(!res.length||/\d/.test(q)||q.split(/\s+/).length>2){
+  if(adresse){ try{ const j=await getJSON(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(q)}&limit=6`,15000);
+    res=(j.features||[]).map(f=>({nom:f.properties.label,detail:[f.properties.context].filter(Boolean).join(""),lat:f.geometry.coordinates[1],lon:f.geometry.coordinates[0],score:f.properties.score||0,type:f.properties.type,adresse:true})).filter(x=>x.score>=0.35); }catch(e){} }
+  if(!res.length){ try{ const j=await getJSON(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=8&language=fr&format=json`,15000);
+    res=(j.results||[]).map(x=>({nom:x.name,detail:[x.admin3,x.admin2,x.admin1,x.country].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).join(", "),lat:x.latitude,lon:x.longitude,pop:x.population||0})); }catch(e){} }
+  if(!res.length||(!adresse&&q.split(/\s+/).length>2)){
     try{ const j=await getJSON(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=8&accept-language=fr&q=${encodeURIComponent(q)}`,15000);
       const vus=new Set(res.map(x=>x.lat.toFixed(3)+x.lon.toFixed(3)));
       for(const x of (Array.isArray(j)?j:[])){ const la=+x.lat, lo=+x.lon, k=la.toFixed(3)+lo.toFixed(3); if(vus.has(k)) continue; vus.add(k);
-        res.push({nom:x.name||String(x.display_name).split(",")[0],detail:String(x.display_name).split(",").slice(1).join(",").trim(),lat:la,lon:lo,pop:0}); } }catch(e){}
+        res.push({nom:x.name||String(x.display_name).split(",")[0],detail:String(x.display_name).split(",").slice(1).join(",").trim(),lat:la,lon:lo,pop:0,adresse:/house|building|road|street/.test(x.type||x.addresstype||"")}); } }catch(e){}
   }
   rechercheRes=res.slice(0,10);
-  if(!rechercheRes.length){ box.innerHTML=`<p class="small muted">Aucun résultat pour « ${esc(q)} ». La recherche demande un accès réseau direct (version web GitHub).</p>`; return; }
-  box.innerHTML=rechercheRes.map((x,i)=>`<div class="zone"><div class="meta"><b>${esc(x.nom)}</b> <span class="small muted">${esc(x.detail)}${x.pop?" · "+fmt(x.pop)+" hab.":""}</span><br><span class="small muted mono">${x.lat.toFixed(4)}, ${x.lon.toFixed(4)}</span></div><button data-geo="${i}">Choisir</button></div>`).join("");
+  if(!rechercheRes.length){ box.innerHTML=`<p class="small muted">Aucun lieu trouvé pour « ${esc(q)} ». Vérifie l'orthographe ou ajoute la ville. La recherche demande un accès réseau direct (version web GitHub).</p>`; return; }
+  const sur=rechercheRes.length===1||(rechercheRes[0].score>=0.75&&(!rechercheRes[1]||rechercheRes[0].score-rechercheRes[1].score>=0.1));
+  if(auto&&sur){ choisirLieu(rechercheRes[0],true); return; }
+  box.innerHTML=`<p class="small">Plusieurs lieux correspondent, choisis le bon :</p>`+rechercheRes.map((x,i)=>`<div class="zone"><div class="meta"><b>${esc(x.nom)}</b> <span class="small muted">${esc(x.detail||"")}${x.pop?" · "+fmt(x.pop)+" hab.":""}</span></div><button class="primary" data-geo="${i}">Charger</button></div>`).join("");
 }
-$("btnRecherche").addEventListener("click",rechercherLieu);
-$("inRecherche").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); rechercherLieu(); } });
-$("resRecherche").addEventListener("click",e=>{ const b=e.target.closest("button[data-geo]"); if(!b) return; const x=rechercheRes[+b.dataset.geo]; if(!x) return;
+function choisirLieu(x,lancer){
+  const r=+$("selRayon").value;
+  if(x.adresse&&r>1000){ $("selRayon").value="500"; }
   $("inLat").value=x.lat.toFixed(5); $("inLon").value=x.lon.toFixed(5); $("inNom").value=x.nom.slice(0,60); $("selVille").value="";
-  $("resRecherche").innerHTML=`<p class="small ok-t">Zone choisie : <b>${esc(x.nom)}</b> (${x.lat.toFixed(4)}, ${x.lon.toFixed(4)}). Règle le rayon puis lance « Tenter la collecte directe ».</p>`;
-  log(`Lieu choisi : ${x.nom} (${x.lat.toFixed(4)}, ${x.lon.toFixed(4)}).`); });
+  $("resRecherche").innerHTML=`<p class="small ok-t">Lieu trouvé : <b>${esc(x.nom)}</b> (${x.lat.toFixed(4)}, ${x.lon.toFixed(4)}) · rayon ${$("selRayon").value} m${lancer?" · chargement de la zone…":""}</p>`;
+  log(`Lieu choisi : ${x.nom} (${x.lat.toFixed(4)}, ${x.lon.toFixed(4)}).`);
+  if(lancer) collecteDirecte();
+}
+$("btnRecherche").addEventListener("click",()=>rechercherLieu(true));
+$("inRecherche").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); rechercherLieu(true); } });
+$("resRecherche").addEventListener("click",e=>{ const b=e.target.closest("button[data-geo]"); if(!b) return; const x=rechercheRes[+b.dataset.geo]; if(x) choisirLieu(x,true); });
 
 /* ===================== Analyse ===================== */
 function distM(a,b){ const [x1,y1]=proj(a[0],a[1]),[x2,y2]=proj(b[0],b[1]); return Math.hypot(x2-x1,y2-y1); }
@@ -877,6 +920,7 @@ function rendreAnalyse(){
     </tbody></table></div></div>
     ${rendrePopulationHTML()}
     ${rendreEquipementsHTML()}
+    ${rendreDelinquanceHTML()}
   </div>
   ${rendreTransportHTML()}`;
 }
@@ -892,6 +936,79 @@ function rendreTendances(){
   ${lignes.map(([k,x,y,d])=>`<tr><td>${FAMILLES[k]}</td><td class="num">${x}</td><td class="num">${y}</td><td class="num" style="color:var(${d>0?"--ok":d<0?"--bad":"--muted"})">${d>0?"+":""}${d}</td></tr>`).join("")}
   </tbody></table></div>`;
 }
+/* ===================== Synthèse claire des prédictions ===================== */
+const JOURS_LONG=["lundi","mardi","mercredi","jeudi","vendredi","samedi","dimanche"];
+const niveau=v=>v>=75?"élevée":v>=50?"moyenne":"faible";
+const fiabTag=v=>`<span class="rel ${relClass(v)}">Fiabilité ${niveau(v)} · ${v} %</span>`;
+const heureTxt=h=>h+" h";
+function moments(g){ /* pointes en semaine et le week-end, et creux de journée */
+  const pic=(jours)=>{ let b=[-1,0,0]; for(const j of jours) g[j].forEach((v,h)=>{ if(v>b[0]) b=[v,j,h]; }); return b; };
+  const sem=pic([0,1,2,3,4]), we=pic([5,6]);
+  const pm=[0,1,2,3,4].map(j=>g[j].slice(6,11).indexOf(Math.max(...g[j].slice(6,11)))+6), ps=[0,1,2,3,4].map(j=>g[j].slice(15,21).indexOf(Math.max(...g[j].slice(15,21)))+15);
+  const mode=a=>{ const c={}; a.forEach(x=>c[x]=(c[x]||0)+1); return +Object.entries(c).sort((x,y)=>y[1]-x[1])[0][0]; };
+  return {sem,we,matin:mode(pm),soir:mode(ps)};
+}
+function syntheseLignes(){
+  const L=[]; if(!zone) return L;
+  const maintenant=new Date(), apres18=maintenant.getHours()>=18;
+  /* Météo */
+  if(zone.meteo&&zone.meteo.jours.length){
+    const age=Math.floor((Date.now()-new Date(zone.meteo.recupereLe))/86400000);
+    const i=Math.min(zone.meteo.jours.length-1,apres18?1:0), j=zone.meteo.jours[i], wd=jourSemaine(j.date);
+    const qui=i===0?"Aujourd'hui":i===1?"Demain":JOURS_LONG[wd];
+    const morceaux=[`${(WMO[j.code]||"temps variable").toLowerCase()}`,`de ${fmt(j.tmin,0)} à ${fmt(j.tmax,0)} °C`];
+    if(j.probPluie>=40) morceaux.push(`${j.probPluie} % de risque de pluie${j.pluie>=1?` (${fmt(j.pluie,0)} mm)`:""}`);
+    if(j.vent>=40) morceaux.push(`vent fort jusqu'à ${fmt(j.vent,0)} km/h`);
+    const sept=zone.meteo.jours.slice(0,7), pluvieux=sept.filter(x=>x.pluie>=1&&x.probPluie>=50).length;
+    const tmin=Math.min(...sept.map(x=>x.tmin)), tmax=Math.max(...sept.map(x=>x.tmax));
+    L.push({cle:"Météo",texte:`<b>${qui}</b> : ${morceaux.join(", ")}.`,
+      detail:`Sur 7 jours : ${pluvieux?pluvieux+" jour(s) de pluie probable":"pas de pluie notable prévue"}, températures entre ${fmt(tmin,0)} et ${fmt(tmax,0)} °C.${age>=1?" Prévisions vieilles de "+age+" j : refais une collecte.":""}`,
+      fiab:fiabMeteoJour(i,age).v});
+  }
+  /* Affluence */
+  const cals=zone.enrich&&zone.enrich.calibration?Object.entries(zone.enrich.calibration).filter(([k,c])=>!c.erreur):[];
+  if(cals.length){
+    const [cle,cal]=cals[0], c=zone.enrich.comptages[cle], m=moments(cal.indice);
+    let txt=`Heures de pointe en semaine : <b>vers ${heureTxt(m.matin)} et ${heureTxt(m.soir)}</b>.`;
+    if(zone.meteo){ const prev=prevoirJours(cal,zone.meteo.jours), p=prev[apres18?1:0]||prev[0];
+      if(p){ const base=cal.moyJour[p.j], ecart=base?Math.round(100*(p.prevu-base)/base):0;
+        txt+=` ${p===prev[0]&&!apres18?"Aujourd'hui":"Demain"}, environ <b>${fmt(p.prevu)} ${esc(c.unite)}</b> attendus près de la zone${ecart?`, soit ${Math.abs(ecart)} % ${ecart<0?"de moins":"de plus"} qu'un ${JOURS_LONG[p.j]} habituel${p.motif?" à cause de la pluie":""}`:", comme un "+JOURS_LONG[p.j]+" habituel"}.`; } }
+    L.push({cle:"Affluence",texte:txt,detail:`Calculé sur ${cal.jours} jours de comptages réels (${esc(c.source)}) et vérifié sur ${cal.test} jours que le modèle n'avait pas vus.`,fiab:Math.max(0,Math.round(100-cal.eval.wapeJCal))});
+  } else if(lieux.length){
+    const g=activite(), m=moments(g);
+    L.push({cle:"Affluence",texte:`Moments les plus animés : <b>${JOURS_LONG[m.sem[1]]} vers ${heureTxt(m.sem[2])}</b> en semaine, <b>${JOURS_LONG[m.we[1]]} vers ${heureTxt(m.we[2])}</b> le week-end. Pointes habituelles vers ${heureTxt(m.matin)} et ${heureTxt(m.soir)}.`,
+      detail:`Estimation à partir des ${fmt(lieux.length)} lieux de la zone et de leurs horaires. Pas encore de comptage réel ici : c'est une tendance, pas une mesure.`,fiab:fiabActivite()});
+  }
+  /* Danger */
+  if(lieux.length||rues.length){
+    const d=calculerDanger(zone,"tout"), dn=calculerDanger(zone,"nuit");
+    if(d&&d.chauds.length){ const h=d.chauds[0], cause=h.contrib.accidents>=50?"surtout des accidents de la route":h.contrib.evenements>=40?"surtout des faits récents rapportés par la presse":"forte fréquentation (lieux de nuit, gare, grand axe)";
+      const hn=dn&&dn.chauds[0]; const nuit=hn&&hn.rue&&hn.rue!==h.rue?` La nuit, c'est plutôt <b>${esc(hn.rue)}</b>.`:"";
+      L.push({cle:"Sécurité",texte:`Secteur à surveiller en priorité : <b>${esc(h.rue||"secteur sans nom")}</b>, qui concentre ${fmt(h.part,0)} % du risque de la zone (${cause}).${nuit}`,
+        detail:`${d.nAcc} accident(s) réel(s) de 2022 à 2024 et ${d.nEv} événement(s) localisé(s) pris en compte.${d.validation?` Contrôle : les secteurs repérés avec 2022-2023 ont concentré ${fmt(d.validation.captes,0)} % des accidents de 2024.`:""}`,fiab:d.fiab,carte:true}); }
+  }
+  /* Événements */
+  const ez=evenementsZone(zone).filter(e=>Date.now()-new Date(e.date)<30*86400000);
+  if(ez.length){ const graves=ez.filter(e=>e.gravite>=4), dern=ez[ez.length-1];
+    L.push({cle:"Actualité",texte:`<b>${ez.length} événement(s)</b> rapporté(s) dans la zone ou la commune ce dernier mois${graves.length?`, dont ${graves.length} grave(s)`:""}. Dernier : ${esc(dern.typeLib.toLowerCase())}, le ${new Date(dern.date).toLocaleDateString("fr-FR")}${dern.lieu?" ("+esc(dern.lieu)+")":""}.`,
+      detail:"Source : articles d'Actu17, classés et localisés automatiquement. Voir la section Événements.",fiab:Math.min(70,30+ez.filter(e=>e.precision==="rue").length*8)}); }
+  /* Délinquance */
+  const D=zone.enrich&&zone.enrich.delinquance;
+  if(D&&D.indicateurs.length){ const ev=D.indicateurs.filter(x=>x.tauxPrec).map(x=>({...x,v:(x.taux-x.tauxPrec)/x.tauxPrec})).sort((a,b)=>Math.abs(b.v)-Math.abs(a.v))[0], top=D.indicateurs[0];
+    let txt=`Dans la commune, le délit le plus fréquent est <b>${esc(top.indicateur.toLowerCase())}</b> (${fmt(top.taux,1)} pour 1 000 habitants en ${D.annee}).`;
+    if(ev&&Math.abs(ev.v)>=0.05) txt+=` Plus forte évolution sur un an : ${esc(ev.indicateur.toLowerCase())}, <b>${ev.v>0?"en hausse":"en baisse"} de ${fmt(Math.abs(ev.v)*100,0)} %</b>.`;
+    L.push({cle:"Délinquance",texte:txt,detail:"Chiffres officiels du ministère de l'Intérieur (SSMSI), pour toute la commune.",fiab:85}); }
+  return L;
+}
+let detailsOuverts=false;
+function rendreSyntheseHTML(){
+  const L=syntheseLignes();
+  if(!L.length) return "";
+  return `<div class="synthese"><h3 style="margin:0">En bref${zone?" · "+esc(zone.nom):""}</h3>
+    ${L.map(l=>`<div class="syn"><div class="syn-tete"><span class="syn-lab">${l.cle}</span>${fiabTag(l.fiab)}</div><p>${l.texte}</p><p class="small muted">${l.detail}${l.carte?` <button class="lien" id="btnSynCarte">${coucheDanger?"Masquer":"Voir"} sur la carte</button>`:""}</p></div>`).join("")}
+    <p class="small muted" style="margin:0">La fiabilité indique à quel point Predictor peut se fier à chaque phrase : élevée = vérifiée sur des données réelles, faible = simple tendance.</p></div>`;
+}
+
 function rendrePredictions(){
   const box=$("pred");
   if(!zone||(!lieux.length&&!zone.meteo)){ box.innerHTML='<p class="empty">Les prédictions utilisent la carte (fréquentation) et la météo. Intègre au moins l\'une des deux.</p>'; return; }
@@ -924,7 +1041,10 @@ function rendrePredictions(){
     html+=`<div><h3>Tendances</h3>${rendreTendances()}</div>`;
   }
   if(lieux.length||zone.enrich){ html+=rendreCalageHTML(); html+=rendreSuiviHTML(); }
-  box.innerHTML=`<div style="display:flex;flex-direction:column;gap:14px">${html}</div>`;
+  if(lieux.length||rues.length) html=rendreDangerHTML()+html;
+  box.innerHTML=`<div style="display:flex;flex-direction:column;gap:14px">${rendreSyntheseHTML()}
+    <details class="calc" id="detCalc"${detailsOuverts?" open":""}><summary>Voir le détail des calculs (tableaux, cartes horaires, contrôles)</summary><div style="display:flex;flex-direction:column;gap:14px">${html}</div></details></div>`;
+  const dc=$("detCalc"); if(dc&&dc.addEventListener) dc.addEventListener("toggle",()=>{ detailsOuverts=dc.open; });
 }
 
 /* ===================== Transports (OSM : arrêts, lignes, fréquences) ===================== */
@@ -1138,8 +1258,18 @@ async function enrichir(){
       E.comptages={...(E.comptages||{}),velo:c}; return `${c.capteurs.length||"?"} compteur(s), ${c.serie.length} heures mesurées`; }),
     etape("trafic","Comptages routiers mesurés",async()=>{
       const c=await chargerComptage("trafic",z,35,sig); if(!c.serie.length){ E.comptages={...(E.comptages||{}),trafic:null}; return "aucun capteur dans la zone (données disponibles à Paris uniquement)"; }
-      E.comptages={...(E.comptages||{}),trafic:c}; return `${c.capteurs.length>=50?"50+":c.capteurs.length||"?"} capteur(s), ${c.serie.length} heures mesurées`; })
+      E.comptages={...(E.comptages||{}),trafic:c}; return `${c.capteurs.length>=50?"50+":c.capteurs.length||"?"} capteur(s), ${c.serie.length} heures mesurées`; }),
+    etape("acc","Accidents de la route 2022-2024 (BAAC)",async()=>{
+      E.accidents=await chargerAccidents(z,sig); const p=E.accidents.points, nuit=p.filter(a=>NUIT(a[4])||a[5]>=3).length;
+      return `${p.length} accident(s) corporel(s) localisé(s) dans la zone, dont ${nuit} de nuit${E.accidents.tronque?" (liste tronquée)":""}`; })
   ]);
+  if(E.demographie&&E.demographie.code) await etape("delinq","Délinquance enregistrée (SSMSI)",async()=>{
+    E.delinquance=await chargerDelinquance(E.demographie.code,sig); const top=E.delinquance.indicateurs[0];
+    return `commune ${E.delinquance.code}, ${E.delinquance.annee}, ${E.delinquance.indicateurs.length} indicateurs${top?" (plus élevé : "+top.indicateur.toLowerCase()+")":""}`; });
+  else etapeUI("delinq","Délinquance enregistrée : commune inconnue (France uniquement)","info");
+  await etape("actu17","Événements Actu17",async()=>{
+    const f=await chargerFluxActu17(sig,m=>etapeUI("actu17",m,"cours")); const nv=await analyserFlux(f.items,sig,m=>etapeUI("actu17",m,"cours")); await sauverEvenements(); rendreEvenements();
+    return `${f.items.length} articles lus (${f.source}), ${nv} nouveaux analysés, ${evenementsZone(z).length} dans la zone`; });
   /* calage du moteur */
   etapeUI("cal","Calage du moteur…","cours");
   const act=lieux.length?activite():null; E.calibration={};
@@ -1152,7 +1282,7 @@ async function enrichir(){
   for(const [cle,cal] of cals) if(z.meteo) suiviActuel=majSuivi(suiviActuel,cle,cal,prevoirJours(cal,z.meteo.jours));
   await ecrireSuivi(z.id,suiviActuel);
   E.date=new Date().toISOString(); E.version=VERSION;
-  log(`Enrichissement terminé : ${reussites}/5 sources réussies${cals.length?", moteur calé sur "+cals.length+" série(s) mesurée(s)":""}.`,reussites?"o":"w");
+  log(`Enrichissement terminé : ${reussites}/8 sources réussies${cals.length?", moteur calé sur "+cals.length+" série(s) mesurée(s)":""}.`,reussites?"o":"w");
   toutAfficher(false); etapeUI("save","Enregistrement…","cours"); await sauverEnrich(); etapeUI("save",db?"Enregistré en mémoire":"Conservé le temps de la visite (exporte la zone pour la garder)","info");
   }finally{ enrichEnCours=false; $("btnEnrich").disabled=false; chargeurFin(); }
 }
@@ -1160,6 +1290,7 @@ async function sauverEnrich(){
   if(!db||!peutEcrire||!zone) return;
   const z=zone; let E=JSON.parse(JSON.stringify(z.enrich||{}));
   if(JSON.stringify(E).length>240000) for(const k of ["velo","trafic"]) if(E.comptages&&E.comptages[k]) E.comptages[k].serie=E.comptages[k].serie.slice(-700);
+  if(JSON.stringify(E).length>240000&&E.accidents) E.accidents.points=E.accidents.points.slice(-1500);
   try{ await ecrire(db.collection("zones").doc(z.id).collection("donnees").doc("enrich"),{enrich:E,version:VERSION}); z.aEnrich=true;
     await ecrire(db.collection("zones").doc(z.id),metaZone(z)); log("Données d'enrichissement enregistrées en mémoire.","o"); }
   catch(e){ log("Enrichissement non enregistré : "+erreurDb(e)+".","e"); }
@@ -1168,7 +1299,7 @@ async function sauverEnrich(){
 /* ===================== Paquet d'échange (version web → version Claude) ===================== */
 function construirePaquet(){
   return {predictorPaquet:1,version:VERSION,cree:new Date().toISOString(),zone:metaZone(zone),lieux:lieux.map(encoderLieu),rues:rues.map(encoderRue),
-    transport:zone.transport||null,enrich:zone.enrich||null,suivi:suiviActuel};
+    transport:zone.transport||null,enrich:zone.enrich||null,suivi:suiviActuel,evenements};
 }
 function exporterZone(){
   if(!zone){ log("Export impossible : aucune zone active.","w"); return; }
@@ -1185,9 +1316,303 @@ async function importerPaquet(p){
   $("inLat").value=zone.lat; $("inLon").value=zone.lon; $("selRayon").value=String(zone.rayon); $("inNom").value=zone.nom;
   const anc=await lireSuivi(zone.id), cles=new Set(anc.map(e=>e.source+e.cible+e.horizon));
   suiviActuel=anc.concat((p.suivi||[]).filter(e=>!cles.has(e.source+e.cible+e.horizon))).slice(-300);
+  if(Array.isArray(p.evenements)&&p.evenements.length){ const m=new Map(evenements.map(e=>[e.lien,e])); for(const e of p.evenements) if(!m.has(e.lien)) m.set(e.lien,e);
+    evenements=[...m.values()].sort((a,b)=>a.date<b.date?-1:1).slice(-400); await sauverEvenements(); rendreEvenements(); }
   log(`Paquet importé (v${p.version||"?"}) : « ${zone.nom} », ${lieux.length} lieux, ${rues.length} segments${zone.transport?", "+zone.transport.lignes.length+" lignes de transport":""}${zone.enrich?", données enrichies":""}.`,"o");
   toutAfficher(true); await sauverZone(true); await sauverEnrich(); await ecrireSuivi(zone.id,suiviActuel);
 }
+
+/* ===================== Accidents de la route (BAAC, data.gouv.fr) ===================== */
+const TABULAR="https://tabular-api.data.gouv.fr/api/resources/";
+const RES_ACCIDENTS={2024:"83f0fb0e-e0ef-47fe-93dd-9aaee851674a",2023:"104dbb32-704f-4e99-a71e-43563cb604f2",2022:"5fc299c0-4598-4c29-b74c-6a67b0cc27e7"};
+const RES_DELINQUANCE="44ef4323-1097-48d5-8719-3c544b55d294";
+const LUM={1:"jour",2:"crépuscule",3:"nuit sans éclairage",4:"nuit, éclairage éteint",5:"nuit avec éclairage"};
+const num=v=>v==null||v===""?NaN:+String(v).replace(",",".");
+async function tabularTout(url,signal,maxPages=30){
+  const lignes=[]; let suivant=url, p=0;
+  while(suivant&&p<maxPages){ const j=await getJSON(suivant,30000,signal); lignes.push(...(j.data||[])); suivant=j.links&&j.links.next; p++; }
+  return {lignes,tronque:!!suivant};
+}
+function bboxZone(z,marge=1.05){ const m=z.rayon*marge, dLat=m/110540, dLon=m/(111320*Math.cos(z.lat*Math.PI/180));
+  return {s:z.lat-dLat,n:z.lat+dLat,w:z.lon-dLon,e:z.lon+dLon}; }
+function dansZone(z,la,lo){ const c=Math.cos(z.lat*Math.PI/180); return Math.hypot((lo-z.lon)*111320*c,(la-z.lat)*110540)<=z.rayon; }
+async function chargerAccidents(z,signal){
+  const b=bboxZone(z), res=[]; let tronque=false;
+  await Promise.all(Object.entries(RES_ACCIDENTS).map(async([an,id])=>{
+    const r=await tabularTout(`${TABULAR}${id}/data/?lat__greater=${b.s.toFixed(5)}&lat__less=${b.n.toFixed(5)}&long__greater=${b.w.toFixed(5)}&long__less=${b.e.toFixed(5)}&page_size=50`,signal);
+    if(r.tronque) tronque=true;
+    for(const x of r.lignes){ const la=num(x.lat), lo=num(x.long); if(!isFinite(la)||!isFinite(lo)||!dansZone(z,la,lo)) continue;
+      const hm=/^\d{1,2}:\d{2}$/.test(String(x.hrmn))?+String(x.hrmn).split(":")[0]:null;
+      res.push([Math.round(la*1e5)/1e5,Math.round(lo*1e5)/1e5,+an,+x.mois||0,hm,+x.lum||0,+x.int||0,String(x.adr||"").slice(0,40)]); }
+  }));
+  return {points:res,annees:Object.keys(RES_ACCIDENTS).map(Number),tronque,date:new Date().toISOString()};
+}
+
+/* ===================== Délinquance enregistrée (SSMSI, par commune) ===================== */
+const CODE_COMMUNE_PARENTE=c=>/^751\d\d$/.test(c)?"75056":/^6938\d$/.test(c)?"69123":/^132\d\d$/.test(c)?"13055":c;
+async function chargerDelinquance(code,signal){
+  const cg=CODE_COMMUNE_PARENTE(code);
+  const echant=await getJSON(`${TABULAR}${RES_DELINQUANCE}/data/?page_size=1`,30000,signal);
+  const col=Object.keys((echant.data||[])[0]||{}).find(k=>/^CODGEO/i.test(k))||"CODGEO_2026";
+  const r=await tabularTout(`${TABULAR}${RES_DELINQUANCE}/data/?${col}__exact=${cg}&page_size=50`,signal,12);
+  if(!r.lignes.length) throw new Error("aucune statistique pour la commune "+cg);
+  const annees=[...new Set(r.lignes.map(x=>+x.annee))].sort((a,b)=>b-a), der=annees[0], prec=annees[1];
+  const val=x=>{ const t=num(x.taux_pour_mille); return isFinite(t)?t:num(x.complement_info_taux); };
+  const nb=x=>{ const t=num(x.nombre); return isFinite(t)?t:num(x.complement_info_nombre); };
+  const ind=[...new Set(r.lignes.map(x=>x.indicateur))].map(nom=>{
+    const a=r.lignes.find(x=>x.indicateur===nom&&+x.annee===der), b=r.lignes.find(x=>x.indicateur===nom&&+x.annee===prec);
+    return {indicateur:nom,unite:a?a.unite_de_compte:"",nombre:a?nb(a):null,taux:a?val(a):null,tauxPrec:b?val(b):null,diffuse:a?String(a.est_diffuse).startsWith("diff"):false};
+  }).filter(x=>x.taux!=null&&isFinite(x.taux)).sort((a,b)=>b.taux-a.taux);
+  const pop=num((r.lignes.find(x=>+x.annee===der)||{}).insee_pop);
+  return {code:cg,annee:der,anneePrec:prec,population:isFinite(pop)?pop:null,indicateurs:ind,date:new Date().toISOString()};
+}
+
+/* ===================== Actu17 : flux, analyse, localisation ===================== */
+const DEPTS="01 Ain|02 Aisne|03 Allier|04 Alpes-de-Haute-Provence|05 Hautes-Alpes|06 Alpes-Maritimes|07 Ardèche|08 Ardennes|09 Ariège|10 Aube|11 Aude|12 Aveyron|13 Bouches-du-Rhône|14 Calvados|15 Cantal|16 Charente|17 Charente-Maritime|18 Cher|19 Corrèze|2A Corse-du-Sud|2B Haute-Corse|21 Côte-d'Or|22 Côtes-d'Armor|23 Creuse|24 Dordogne|25 Doubs|26 Drôme|27 Eure|28 Eure-et-Loir|29 Finistère|30 Gard|31 Haute-Garonne|32 Gers|33 Gironde|34 Hérault|35 Ille-et-Vilaine|36 Indre|37 Indre-et-Loire|38 Isère|39 Jura|40 Landes|41 Loir-et-Cher|42 Loire|43 Haute-Loire|44 Loire-Atlantique|45 Loiret|46 Lot|47 Lot-et-Garonne|48 Lozère|49 Maine-et-Loire|50 Manche|51 Marne|52 Haute-Marne|53 Mayenne|54 Meurthe-et-Moselle|55 Meuse|56 Morbihan|57 Moselle|58 Nièvre|59 Nord|60 Oise|61 Orne|62 Pas-de-Calais|63 Puy-de-Dôme|64 Pyrénées-Atlantiques|65 Hautes-Pyrénées|66 Pyrénées-Orientales|67 Bas-Rhin|68 Haut-Rhin|69 Rhône|70 Haute-Saône|71 Saône-et-Loire|72 Sarthe|73 Savoie|74 Haute-Savoie|75 Paris|76 Seine-Maritime|77 Seine-et-Marne|78 Yvelines|79 Deux-Sèvres|80 Somme|81 Tarn|82 Tarn-et-Garonne|83 Var|84 Vaucluse|85 Vendée|86 Vienne|87 Haute-Vienne|88 Vosges|89 Yonne|90 Territoire de Belfort|91 Essonne|92 Hauts-de-Seine|93 Seine-Saint-Denis|94 Val-de-Marne|95 Val-d'Oise|971 Guadeloupe|972 Martinique|973 Guyane|974 La Réunion|976 Mayotte"
+  .split("|").map(s=>{ const i=s.indexOf(" "); return [s.slice(0,i),s.slice(i+1)]; });
+const normTxt=s=>String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[’']/g,"'").trim();
+const DEPT_PAR_NOM=new Map(DEPTS.map(([c,n])=>[normTxt(n),c]));
+const TYPES_EVT=[
+  ["homicide","Homicide / mort violente",5,/\b(tu[ée]e?s?|meurtre|homicide|assassin|abattu|mort (?:par|apr[eè]s|lors)|d[ée]c[eè]s.{0,30}(?:coups|bless))/],
+  ["arme","Tirs / arme à feu",5,/\b(fusillade|tirs?\b|coups? de feu|arme (?:à|a) feu|kalachnikov|balles?)\b/],
+  ["couteau","Agression au couteau",4,/\b(couteau|poignard|arme blanche|lacér|égorg)/],
+  ["agression","Agression / violences",3,/\b(agress|violences?|frapp|tabass|passage à tabac|coups\b|rixe|bagarre)/],
+  ["sexuel","Violences sexuelles",4,/\b(viol|agression sexuelle|attouchement|exhib)/],
+  ["vol","Vol / cambriolage / braquage",2,/\b(vol\b|vols\b|vol[ée]e?s?\b|cambriol|braqu|arrach|car-?jacking|home-?jacking|escroqu)/],
+  ["stupefiants","Trafic de stupéfiants",2,/\b(stup[ée]fiant|drogue|cannabis|coca[iï]ne|point de deal|dealer|trafic)/],
+  ["urbaines","Violences urbaines / mortiers",3,/\b(violences urbaines|[ée]meute|mortiers?|guet-?apens|incendi[ée]s? (?:volontaire|de v[ée]hicule)|v[ée]hicules? incendi)/],
+  ["route","Accident / refus d'obtempérer",3,/\b(accident|percut|renvers|refus d'obtemp[ée]rer|course-poursuite|chauffard|collision)/],
+  ["incendie","Incendie",2,/\b(incendie|feu\b|flammes|explosion)/],
+  ["policiers","Violences contre forces de l'ordre",3,/\b(policiers? (?:bless|agress|vis[ée]s|pris pour cible)|gendarmes? (?:bless|agress)|outrage|rebellion|rébellion)/],
+  ["manif","Manifestation / ordre public",1,/\b(manifest|blocage|rassemblement|mobilisation|interpellations?)\b/],
+  ["terrorisme","Terrorisme",5,/\b(terroris|attentat|djihad|jihad)/]
+];
+function classerEvenement(txt){
+  const t=normTxt(txt).replace(/[ée]/g,"e");
+  const tn=normTxt(txt);
+  let best=null;
+  for(const [cle,lib,g,re] of TYPES_EVT){ const re2=new RegExp(re.source.normalize("NFD").replace(/[̀-ͯ]/g,""),"i"); if(re2.test(tn)||re2.test(t)){ if(!best||g>best.g) best={cle,lib,g}; } }
+  return best||{cle:"autre",lib:"Autre (justice, société…)",g:1};
+}
+const decEnt=s=>String(s||"").replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g,"$1").replace(/<[^>]+>/g," ").replace(/&#(\d+);/g,(m,d)=>String.fromCharCode(+d)).replace(/&#x([0-9a-f]+);/gi,(m,h)=>String.fromCharCode(parseInt(h,16)))
+  .replace(/&nbsp;/g," ").replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&quot;/g,'"').replace(/&apos;|&rsquo;|&#8217;/g,"’").replace(/\s+/g," ").trim();
+function lireRSS(xml){
+  const items=[]; const re=/<item\b[\s\S]*?<\/item>/gi; let m;
+  const champ=(b,t)=>{ const r=b.match(new RegExp(`<${t}\\b[^>]*>([\\s\\S]*?)<\\/${t}>`,"i")); return r?decEnt(r[1]):""; };
+  while((m=re.exec(xml))){ const b=m[0];
+    const cats=[...b.matchAll(/<category\b[^>]*>([\s\S]*?)<\/category>/gi)].map(x=>decEnt(x[1]));
+    const lien=champ(b,"link")||champ(b,"guid");
+    items.push({titre:champ(b,"title"),lien,date:new Date(champ(b,"pubDate")||Date.now()).toISOString(),categories:cats,resume:champ(b,"description").replace(/L’article .*? est apparu en premier sur .*$/,"").slice(0,400)}); }
+  if(!items.length) throw new Error("aucun article trouvé dans le flux");
+  return items;
+}
+const VOIE=/\b(rue|avenue|av\.|boulevard|bd|place|quai|cours|all[ée]e|impasse|chemin|route|square|passage|esplanade|cit[ée]|parvis|pont|porte|gare)\s+(?:de la |de l'|de l’|des |du |de |d'|d’)?([A-ZÉÈÀÂÎÔÛ][\w'’\-éèêëàâîïôöûüç]*(?:[ \-](?:de|du|des|la|le|les|d'|l'|[A-ZÉÈÀÂÎÔÛ0-9][\w'’\-éèêëàâîïôöûüç]*)){0,4})/;
+const COMMUNE_PAR=/([A-ZÉÈÀÂÎÔÛ][\w'’éèêëàâîïôöûüç]+(?:[ \-](?:sur|sous|en|le|la|les|lès|lez|de|du|des|aux|au|d'|d’|l'|l’|Saint|Sainte|St|[A-ZÉÈÀÂÎÔÛ][\w'’éèêëàâîïôöûüç]+)){0,5})\s*\(([^)]{2,40})\)/g;
+const MOTS_NON_LIEUX=new Set(["IGPN","OFAC","SCPN","PJ","BAC","CRS","GIGN","RAID","Police","Gendarmerie","Le","La","Les","Un","Une","Des","Ce","Cette","Il","Elle","Selon","Après","Alors","Lors"]);
+function extraireLieux(titre,resume){
+  const txt=titre+" — "+resume, cands=[];
+  for(const m of txt.matchAll(COMMUNE_PAR)){ const nom=m[1].trim(), par=m[2].trim(); if(MOTS_NON_LIEUX.has(nom)) continue;
+    const dep=/^\d{2,3}$|^2[AB]$/i.test(par)?par.toUpperCase():DEPT_PAR_NOM.get(normTxt(par))||null;
+    if(dep||/^[A-ZÉ]/.test(par)) cands.push({commune:nom,dep,poids:dep?3:1}); }
+  const pre=titre.match(/^([A-ZÉÈÀÂÎÔÛ][^:]{2,40})\s*:/);
+  if(pre){ const p=pre[1].trim(), dep=DEPT_PAR_NOM.get(normTxt(p)); if(dep&&dep!=="75") cands.push({departement:dep,poids:1}); else if(!MOTS_NON_LIEUX.has(p)) cands.push({commune:p.replace(/\s*\(.*$/,""),dep:dep||null,poids:2}); }
+  for(const m of txt.matchAll(/\b(?:à|À|a)\s+([A-ZÉÈÀÂÎÔÛ][\w'’éèêëàâîïôöûüç]+(?:[ \-](?:sur|sous|en|le|la|les|lès|de|du|des|d'|d’|l'|Saint|Sainte|[A-ZÉÈÀÂÎÔÛ][\w'’éèêëàâîïôöûüç]+)){0,4})/g)){
+    const nom=m[1].trim(); if(MOTS_NON_LIEUX.has(nom.split(/[ \-]/)[0])) continue; cands.push({commune:nom,dep:null,poids:1}); }
+  const arr=txt.match(/\b(\d{1,2})(?:e|er|ème)\s+arrondissement(?:\s+de\s+(Paris|Lyon|Marseille))?/i);
+  if(arr){ const v=(arr[2]||"Paris").toLowerCase(), n=+arr[1]; const base=v==="lyon"?69380:v==="marseille"?13200:75100; if(n>=1&&n<=20) cands.push({codeInsee:String(base+n),poids:3}); }
+  const voie=txt.match(VOIE);
+  const vus=new Set(), uniq=[];
+  for(const c of cands.sort((a,b)=>b.poids-a.poids)){ const k=(c.commune||c.codeInsee||c.departement)+"|"+(c.dep||""); if(!vus.has(k)){ vus.add(k); uniq.push(c); } }
+  return {candidats:uniq.slice(0,4),voie:voie?(voie[1]+" "+voie[0].slice(voie[1].length).trim()).replace(/\s+/g," "):null};
+}
+const cacheGeo=new Map();
+async function geocoderEvenement(ex,signal){
+  for(const c of ex.candidats){
+    try{
+      let commune=null;
+      if(c.codeInsee){ const k="code:"+c.codeInsee; if(!cacheGeo.has(k)){ const r=await getJSON(`https://geo.api.gouv.fr/communes/${c.codeInsee}?fields=nom,code,centre,codeDepartement`,15000,signal); cacheGeo.set(k,r); } commune=cacheGeo.get(k); }
+      else if(c.commune){ const k="nom:"+normTxt(c.commune)+"|"+(c.dep||"");
+        if(!cacheGeo.has(k)){ const r=await getJSON(`https://geo.api.gouv.fr/communes?nom=${encodeURIComponent(c.commune)}&fields=nom,code,centre,codeDepartement,population&boost=population&limit=6`,15000,signal);
+          const L=(Array.isArray(r)?r:[]).filter(x=>normTxt(x.nom)===normTxt(c.commune)||normTxt(x.nom).startsWith(normTxt(c.commune)));
+          const choix=(c.dep?L.find(x=>x.codeDepartement===c.dep):null)||L.sort((a,b)=>(b.population||0)-(a.population||0))[0]||null; cacheGeo.set(k,choix); }
+        commune=cacheGeo.get(k); }
+      else if(c.departement){ return {precision:"département",departement:c.departement,lieu:(DEPTS.find(d=>d[0]===c.departement)||[])[1]||c.departement}; }
+      if(!commune||!commune.centre) continue;
+      const [lo,la]=commune.centre.coordinates;
+      if(ex.voie){ const k="adr:"+normTxt(ex.voie)+"|"+commune.code;
+        if(!cacheGeo.has(k)){ let best=null; try{ const r=await getJSON(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(ex.voie)}&citycode=${commune.code}&limit=1`,15000,signal);
+            const f=r.features&&r.features[0]; if(f&&f.properties.score>=0.55) best={lat:f.geometry.coordinates[1],lon:f.geometry.coordinates[0],label:f.properties.label}; }catch(e){ if(signal&&signal.aborted) throw e; }
+          cacheGeo.set(k,best); }
+        const a=cacheGeo.get(k); if(a) return {precision:"rue",lat:a.lat,lon:a.lon,lieu:a.label,code:commune.code,departement:commune.codeDepartement}; }
+      return {precision:"commune",lat:la,lon:lo,lieu:commune.nom,code:commune.code,departement:commune.codeDepartement};
+    }catch(e){ if(signal&&signal.aborted) throw e; }
+  }
+  return {precision:"inconnue"};
+}
+function depoInfo(){ const h=location.host.match(/^([\w\-]+)\.github\.io$/i), seg=location.pathname.split("/").filter(Boolean)[0];
+  return h&&seg?{owner:h[1],repo:seg}:{owner:"wwwh8hv4w5-lang",repo:"Predictor"}; }
+async function chargerFluxActu17(signal,info){
+  const essais=[["actu17.fr (direct)",["https://actu17.fr/feed/"]]];
+  const d=depoInfo(); essais.push([`copie GitHub (${d.owner}/${d.repo})`,[1,2,3].map(p=>`https://raw.githubusercontent.com/${d.owner}/${d.repo}/main/data/actu17-${p}.xml`)]);
+  let derniere="";
+  for(const [nom,urls] of essais){
+    try{ info&&info("Actu17 · "+nom+"…"); const textes=[];
+      for(const u of urls){ const ctl=new AbortController(), t=setTimeout(()=>ctl.abort(),20000), stop=()=>ctl.abort(); signal&&signal.addEventListener("abort",stop,{once:true});
+        try{ const r=await fetch(u,{signal:ctl.signal,cache:"no-store"}); if(r.ok) textes.push(await r.text()); else if(!textes.length) throw new Error("HTTP "+r.status); }
+        finally{ clearTimeout(t); signal&&signal.removeEventListener("abort",stop); } }
+      const items=[]; for(const x of textes){ try{ items.push(...lireRSS(x)); }catch(e){} }
+      if(!items.length) throw new Error("flux vide ou illisible");
+      return {items,source:nom};
+    }catch(e){ if(signal&&signal.aborted) throw new Error("collecte arrêtée"); derniere=nom+" : "+(e.name==="AbortError"?"pas de réponse":(e.message||e)); }
+  }
+  throw new Error("flux inaccessible ("+derniere+"). Ajoute le robot GitHub (fichier actu17.yml) ou importe le flux à la main.");
+}
+let evenements=[]; /* base d'événements analysés, partagée entre zones */
+const CLE_EVT="predictor-evenements";
+async function lireEvenements(){
+  if(db){ try{ const s=await db.doc("evenements/actu17").get(); if(s.exists) return s.data().items||[]; }catch(e){} return []; }
+  try{ return JSON.parse(localStorage.getItem(CLE_EVT)||"[]"); }catch(e){ return []; }
+}
+async function sauverEvenements(){
+  const items=evenements.slice(-400);
+  if(db&&peutEcrire){ try{ await ecrire(db.doc("evenements/actu17"),{items,version:VERSION,maj:new Date().toISOString()}); }catch(e){ log("Événements non enregistrés : "+erreurDb(e)+".","e"); } return; }
+  try{ localStorage.setItem(CLE_EVT,JSON.stringify(items)); }catch(e){}
+}
+async function analyserFlux(items,signal,info){
+  const connus=new Map(evenements.map(e=>[e.lien,e])); let nouveaux=0;
+  for(const it of items){
+    if(connus.has(it.lien)) continue;
+    const typ=classerEvenement(it.titre+" "+it.resume+" "+it.categories.join(" "));
+    const ex=extraireLieux(it.titre,it.resume);
+    info&&info(`Actu17 · localisation ${nouveaux+1} : ${it.titre.slice(0,50)}…`);
+    let geo={precision:"inconnue"}; try{ geo=await geocoderEvenement(ex,signal); }catch(e){ if(signal&&signal.aborted) throw e; }
+    const e={lien:it.lien,titre:it.titre,date:it.date,categories:it.categories,resume:it.resume.slice(0,280),type:typ.cle,typeLib:typ.lib,gravite:typ.g,voie:ex.voie,...geo,analyse:"règles",version:VERSION};
+    connus.set(it.lien,e); nouveaux++;
+  }
+  evenements=[...connus.values()].sort((a,b)=>a.date<b.date?-1:1).slice(-400);
+  return nouveaux;
+}
+function evenementsZone(z){
+  if(!z) return [];
+  const code=z.enrich&&z.enrich.demographie&&z.enrich.demographie.code, parent=code?CODE_COMMUNE_PARENTE(code):null;
+  return evenements.filter(e=>{
+    if(e.precision==="rue"&&isFinite(e.lat)) return dansZone(z,e.lat,e.lon);
+    if(e.precision==="commune"){ if(code&&(e.code===code||e.code===parent)) return true; return isFinite(e.lat)&&dansZone({...z,rayon:Math.max(z.rayon,1500)},e.lat,e.lon); }
+    return false; });
+}
+
+/* ===================== Carte de danger probable ===================== */
+const NUIT=h=>h!=null&&(h>=21||h<6);
+function calculerDanger(z,periode="tout"){
+  if(!z||!lieux.length&&!rues.length) return null;
+  const R=z.rayon, c=Math.max(40,Math.round(R/22)), n=Math.ceil(R/c), sig=1.6*c, cosL=Math.cos(z.lat*Math.PI/180);
+  const P=(la,lo)=>[(lo-z.lon)*111320*cosL,(la-z.lat)*110540];
+  const cells=[]; for(let i=-n;i<=n;i++) for(let j=-n;j<=n;j++){ const x=i*c, y=j*c; if(Math.hypot(x,y)<=R) cells.push({x,y,a:0,e:0,s:0}); }
+  const idx=new Map(cells.map((k,q)=>[Math.round(k.x/c)+"|"+Math.round(k.y/c),q]));
+  const deposer=(x,y,w,champ)=>{ const ci=Math.round(x/c), cj=Math.round(y/c), rr=Math.ceil(3*sig/c);
+    for(let i=ci-rr;i<=ci+rr;i++) for(let j=cj-rr;j<=cj+rr;j++){ const q=idx.get(i+"|"+j); if(q==null) continue; const k=cells[q], d2=(k.x-x)**2+(k.y-y)**2; k[champ]+=w*Math.exp(-d2/(2*sig*sig)); } };
+  const E=z.enrich||{}, acc=(E.accidents&&E.accidents.points)||[];
+  const accP=acc.filter(a=>periode==="tout"||(periode==="nuit"?(NUIT(a[4])||a[5]>=3):!(NUIT(a[4])||a[5]>=3)));
+  for(const a of accP){ const [x,y]=P(a[0],a[1]); deposer(x,y,1+(a[6]>1?0.3:0),"a"); }
+  const evz=evenementsZone(z).filter(e=>e.precision==="rue"), maint=Date.now();
+  for(const e of evz){ const [x,y]=P(e.lat,e.lon), age=(maint-new Date(e.date))/86400000; deposer(x,y,e.gravite*Math.pow(0.5,age/120),"e"); }
+  const nuitF=periode==="nuit"?2:periode==="jour"?0.5:1;
+  for(const l of lieux){ let w=0;
+    if(["bar","pub","nightclub"].includes(l.t)) w=0.6*nuitF; else if(["fast_food","casino"].includes(l.t)) w=0.25*nuitF;
+    else if(["station","subway_entrance","bus_station","halt"].includes(l.t)) w=0.5; else if(l.t==="atm") w=0.15; else if(l.f==="commerce"||l.f==="alimentation") w=0.05*(periode==="nuit"?0.3:1);
+    if(w){ const [x,y]=P(l.lat,l.lon); deposer(x,y,w,"s"); } }
+  for(const r of rues){ if(r.g!=="p") continue; for(let i=1;i<r.p.length;i+=2){ const [x,y]=P(r.p[i][0],r.p[i][1]); deposer(x,y,0.12,"s"); } }
+  const tot=k=>cells.reduce((s,x)=>s+x[k],0), TA=tot("a"), TE=tot("e"), TS=tot("s");
+  const wA=accP.length>=15?0.55:accP.length?0.55*accP.length/15:0, wE=evz.length?Math.min(0.3,0.06*evz.length):0, wS=Math.max(0.15,1-wA-wE);
+  const sW=wA+wE+wS;
+  for(const k of cells){ k.p=(TA?wA*k.a/TA:0)+(TE?wE*k.e/TE:0)+(TS?wS*k.s/TS:0); k.p/=sW||1; }
+  const Ptot=cells.reduce((s,k)=>s+k.p,0)||1; cells.forEach(k=>k.p/=Ptot);
+  const moy=1/cells.length, tri=[...cells].sort((a,b)=>b.p-a.p), points=[];
+  for(const k of tri){ if(points.length>=8||k.p<moy*1.3) break; if(points.some(p=>Math.hypot(p.x-k.x,p.y-k.y)<4*c)) continue; points.push(k); }
+  const latlon=(x,y)=>[z.lat+y/110540,z.lon+x/(111320*cosL)];
+  const chauds=points.map(k=>{ const [la,lo]=latlon(k.x,k.y); let rueN="", dr=1e9;
+    for(const r of rues){ if(!r.n) continue; for(const p of r.p){ const [x,y]=P(p[0],p[1]), d=Math.hypot(x-k.x,y-k.y); if(d<dr){ dr=d; rueN=r.n; } } }
+    const zone3=cells.filter(q=>Math.hypot(q.x-k.x,q.y-k.y)<=2*c), part=zone3.reduce((s,q)=>s+q.p,0);
+    const nAcc=accP.filter(a=>{ const [x,y]=P(a[0],a[1]); return Math.hypot(x-k.x,y-k.y)<=2*c; }).length;
+    const nEv=evz.filter(e=>{ const [x,y]=P(e.lat,e.lon); return Math.hypot(x-k.x,y-k.y)<=2*c; }).length;
+    const ca=TA?wA*k.a/TA:0, ce=TE?wE*k.e/TE:0, cs=TS?wS*k.s/TS:0, cT=ca+ce+cs||1;
+    const nuitLieux=lieux.filter(l=>["bar","pub","nightclub"].includes(l.t)&&Math.hypot(...P(l.lat,l.lon).map((v,i)=>v-(i?k.y:k.x)))<=2*c).length;
+    return {lat:la,lon:lo,rue:rueN,part:Math.round(part*1000)/10,ratio:Math.round(k.p/moy*10)/10,nAcc,nEv,nuitLieux,contrib:{accidents:Math.round(100*ca/cT),evenements:Math.round(100*ce/cT),structure:Math.round(100*cs/cT)}}; }).sort((a,b)=>b.part-a.part);
+  /* validation : modèle 2022-2023 contre accidents 2024 */
+  let validation=null;
+  const app=accP.filter(a=>a[2]<2024), test=accP.filter(a=>a[2]===2024);
+  if(app.length>=20&&test.length>=10){
+    const g=cells.map(k=>({...k,v:0})); const ix=new Map(g.map((k,q)=>[Math.round(k.x/c)+"|"+Math.round(k.y/c),q]));
+    for(const a of app){ const [x,y]=P(a[0],a[1]); const ci=Math.round(x/c), cj=Math.round(y/c), rr=Math.ceil(3*sig/c);
+      for(let i=ci-rr;i<=ci+rr;i++) for(let j=cj-rr;j<=cj+rr;j++){ const q=ix.get(i+"|"+j); if(q==null) continue; const k=g[q]; k.v+=Math.exp(-((k.x-x)**2+(k.y-y)**2)/(2*sig*sig)); } }
+    const seuil=[...g].sort((a,b)=>b.v-a.v)[Math.max(0,Math.floor(g.length*0.1)-1)].v;
+    const hot=new Set(g.filter(k=>k.v>=seuil&&k.v>0).map(k=>Math.round(k.x/c)+"|"+Math.round(k.y/c)));
+    const dans=test.filter(a=>{ const [x,y]=P(a[0],a[1]); return hot.has(Math.round(x/c)+"|"+Math.round(y/c)); }).length;
+    validation={app:app.length,test:test.length,partCellules:Math.round(100*hot.size/g.length),captes:Math.round(1000*dans/test.length)/10};
+  }
+  const fiab=Math.round(Math.min(80,15+Math.min(45,accP.length/6)+Math.min(15,evz.length*1.5)+(validation&&validation.captes>2*validation.partCellules?5:0)));
+  return {periode,c,cells:cells.map(k=>[k.x,k.y,k.p]),moy,chauds,nAcc:accP.length,nEv:evz.length,poids:{accidents:Math.round(100*wA/sW),evenements:Math.round(100*wE/sW),structure:Math.round(100*wS/sW)},validation,fiab};
+}
+let dangerCache=null, periodeDanger="tout", coucheDanger=false, coucheEvt=false;
+function danger(){ if(!zone) return null; const k=zone.id+"|"+periodeDanger+"|"+lieux.length+"|"+((zone.enrich&&zone.enrich.date)||"")+"|"+evenements.length;
+  if(!dangerCache||dangerCache.k!==k) dangerCache={k,d:calculerDanger(zone,periodeDanger)}; return dangerCache.d; }
+
+/* ===================== Rendu : danger, délinquance, événements ===================== */
+function rendreDangerHTML(){
+  const d=danger();
+  if(!d) return `<div><h3>Endroits les plus dangereux (probabilité)</h3><p class="small muted">Disponible dès qu'une carte est intégrée. « Enrichir la zone » ajoute les accidents réels et les événements localisés, qui rendent l'estimation bien plus fiable.</p></div>`;
+  const per={tout:"toute la journée",jour:"le jour",nuit:"la nuit"}[d.periode];
+  return `<div><h3>Endroits les plus dangereux · ${per}</h3>
+    <div class="row"><div class="seg" id="segPeriode">${["tout","jour","nuit"].map(p=>`<button data-periode="${p}" aria-pressed="${p===d.periode}">${{tout:"Journée entière",jour:"Jour",nuit:"Nuit"}[p]}</button>`).join("")}</div>
+      <button id="btnCoucheDanger2" aria-pressed="${coucheDanger}">${coucheDanger?"Masquer":"Afficher"} sur la carte</button></div>
+    <p>En clair : plus un secteur est haut dans cette liste, plus il est probable qu'un incident s'y produise par rapport au reste de la zone.</p>
+    <p class="small muted">Probabilité relative qu'un incident (accident de la route, agression, vol, violences…) survienne à un endroit de la zone plutôt qu'ailleurs dans la zone. Calcul sur ${d.nAcc} accident(s) réel(s) localisé(s) (2022-2024), ${d.nEv} événement(s) Actu17 localisé(s) à la rue, et des facteurs de terrain (lieux de nuit, gares, grands axes). Poids : accidents ${d.poids.accidents} %, événements ${d.poids.evenements} %, terrain ${d.poids.structure} %. Fiabilité ${badge(d.fiab)}.</p>
+    ${d.validation?`<p class="small">Contrôle sur données réelles : les ${d.validation.partCellules} % d'endroits jugés les plus dangereux d'après 2022-2023 ont concentré <b>${fmt(d.validation.captes,1)} %</b> des ${d.validation.test} accidents de 2024 (un tirage au hasard en capterait environ ${d.validation.partCellules} %).</p>`:""}
+    ${d.chauds.length?`<div class="scroll"><table class="wrapt"><thead><tr><th>#</th><th>Secteur et facteurs</th><th class="num">Part du risque</th><th class="num">× moy.</th></tr></thead><tbody>
+    ${d.chauds.map((h,i)=>`<tr><td><b>${i+1}</b></td><td><b>${esc(h.rue||"secteur sans nom")}</b> <span class="small muted mono">${h.lat.toFixed(4)}, ${h.lon.toFixed(4)}</span><br>
+      <span class="small">${[h.nAcc?h.nAcc+" accident(s)":"",h.nEv?h.nEv+" événement(s)":"",h.nuitLieux?h.nuitLieux+" lieu(x) de nuit":""].filter(Boolean).join(" · ")||"facteurs de terrain"}</span><br><span class="small muted">accidents ${h.contrib.accidents} % · événements ${h.contrib.evenements} % · terrain ${h.contrib.structure} %</span></td>
+      <td class="num"><b>${fmt(h.part,1)} %</b></td><td class="num">${fmt(h.ratio,1)}</td></tr>`).join("")}
+    </tbody></table></div>`:`<p class="small muted">Aucun secteur ne se détache nettement de la moyenne de la zone.</p>`}
+    <p class="small muted">« Part du risque » : part des incidents attendus dans la zone qui tomberait dans un rayon de ${2*d.c} m autour du point. C'est une probabilité relative à la zone, pas un risque individuel.</p></div>`;
+}
+function rendreDelinquanceHTML(){
+  const D=zone&&zone.enrich&&zone.enrich.delinquance;
+  if(!D) return `<div><h3>Délinquance enregistrée (commune)</h3><p class="small muted">Disponible après « Enrichir la zone » (statistiques officielles SSMSI, police et gendarmerie, par commune).</p></div>`;
+  return `<div><h3>Délinquance enregistrée · commune ${esc(D.code)} · ${D.annee}</h3>
+    <div class="scroll"><table><thead><tr><th>Indicateur</th><th class="num">Nombre</th><th class="num">‰ hab.</th><th class="num">Évol. vs ${D.anneePrec||"—"}</th></tr></thead><tbody>
+    ${D.indicateurs.slice(0,14).map(x=>{ const ev=x.tauxPrec?Math.round(1000*(x.taux-x.tauxPrec)/x.tauxPrec)/10:null;
+      return `<tr><td>${esc(x.indicateur)}</td><td class="num">${x.nombre!=null&&isFinite(x.nombre)?fmt(Math.round(x.nombre)):"—"}</td><td class="num">${fmt(x.taux,2)}</td><td class="num" style="color:var(${ev==null?"--muted":ev>5?"--bad":ev<-5?"--ok":"--muted"})">${ev==null?"—":(ev>0?"+":"")+fmt(ev,1)+" %"}</td></tr>`; }).join("")}
+    </tbody></table></div><p class="small muted">Source : SSMSI, faits enregistrés par la police et la gendarmerie, rapportés à la population. Valeurs estimées quand le nombre est trop faible pour être publié.</p></div>`;
+}
+function rendreEvenementsHTML(){
+  const ez=evenementsZone(zone), tous=evenements.slice().reverse();
+  const loc=evenements.filter(e=>e.precision!=="inconnue").length;
+  const coulG=g=>g>=4?"--bad":g>=3?"--warn":"--muted";
+  const ligne=e=>`<tr><td class="small mono">${new Date(e.date).toLocaleDateString("fr-FR",{day:"2-digit",month:"2-digit"})}</td><td><span class="small" style="color:var(${coulG(e.gravite)})"><b>${esc(e.typeLib)}</b></span><br><a href="${esc(e.lien)}" target="_blank" rel="noopener">${esc(e.titre.slice(0,140))}</a><br><span class="small muted">${e.precision==="inconnue"?"non localisé":esc(e.lieu||"")+" · précision "+e.precision}</span></td></tr>`;
+  if(!evenements.length) return `<p class="empty">Aucun événement chargé. Utilise « Charger l'actualité » (version web) ou importe le flux d'Actu17.</p>`;
+  const parType={}; for(const e of evenements) parType[e.typeLib]=(parType[e.typeLib]||0)+1;
+  return `<p class="small muted">${evenements.length} article(s) analysés, ${loc} localisé(s). Types : ${Object.entries(parType).sort((a,b)=>b[1]-a[1]).map(([t,n])=>`${esc(t)} ${n}`).join(" · ")}.</p>
+    <h3>Dans la zone active${zone?" · "+esc(zone.nom):""} (${ez.length})</h3>
+    ${ez.length?`<div class="scroll"><table class="wrapt"><tbody>${ez.slice().reverse().map(ligne).join("")}</tbody></table></div>`:`<p class="small muted">Aucun événement récent localisé dans cette zone.</p>`}
+    <details><summary class="small">Tous les événements récents (${tous.length})</summary><div class="scroll"><table class="wrapt"><tbody>${tous.slice(0,80).map(ligne).join("")}</tbody></table></div></details>
+    <p class="small muted">Analyse automatique par mots-clés et géocodage officiel (geo.api.gouv.fr, Base Adresse Nationale). Predictor ne relève aucun nom de personne.</p>`;
+}
+async function chargerActualite(){
+  const sig=chargeurDebut("Actualité · Actu17"); $("btnActu").disabled=true;
+  try{
+    etapeUI("actu","Actu17 · lecture du flux…","cours");
+    const f=await chargerFluxActu17(sig,m=>etapeUI("actu",m,"cours"));
+    etapeUI("actu",`Actu17 : ${f.items.length} article(s) lus (${f.source})`,"ok");
+    etapeUI("actuloc","Analyse et localisation des articles…","cours");
+    const n=await analyserFlux(f.items,sig,m=>etapeUI("actuloc",m,"cours"));
+    const loc=evenements.filter(e=>e.precision!=="inconnue").length;
+    etapeUI("actuloc",`${n} nouvel(s) article(s) analysé(s) · ${loc}/${evenements.length} localisé(s) · ${evenementsZone(zone).length} dans la zone`,"ok");
+    log(`Actu17 : ${f.items.length} articles lus via ${f.source}, ${n} nouveaux analysés.`,"o");
+    await sauverEvenements(); rendreEvenements(); toutAfficher(false);
+  }catch(e){ etapeUI("actu","Actu17 : échec ("+(e.message||e)+")","err"); log("Actu17 : "+(e.message||e),"e"); }
+  finally{ $("btnActu").disabled=false; chargeurFin(); }
+}
+function rendreEvenements(){ const b=$("evt"); if(b) b.innerHTML=rendreEvenementsHTML(); }
 
 /* ===================== Rendu : données approfondies ===================== */
 function rendreTransportHTML(){
@@ -1331,11 +1756,19 @@ function dessiner(){
       for(const r of rues){ if(r.g!==g) continue; r.p.forEach((pt,i)=>{ const [x,y]=versEcran(...proj(pt[0],pt[1])); i?ctx.lineTo(x,y):ctx.moveTo(x,y); }); }
       ctx.stroke(); }
   }
+  if(coucheDanger){ const d=danger(); if(d){ const pm=Math.max(...d.cells.map(k=>k[2])), cs=d.c*vue.s;
+    for(const [x,y,p] of d.cells){ if(p<d.moy*0.9) continue; const [sx,sy]=versEcran(x-d.c/2,y+d.c/2); if(sx>w||sy>h||sx+cs<0||sy+cs<0) continue;
+      const a=Math.min(0.62,0.08+0.6*(p-d.moy*0.9)/(pm-d.moy*0.9||1)); ctx.fillStyle=`rgba(220,38,38,${a.toFixed(3)})`; ctx.fillRect(sx,sy,cs+0.5,cs+0.5); }
+    ctx.font="bold 11px "+css("--font-data"); ctx.textAlign="center";
+    d.chauds.forEach((hh,i)=>{ const [x,y]=versEcran(...proj(hh.lat,hh.lon)); ctx.fillStyle="rgba(0,0,0,.7)"; ctx.beginPath(); ctx.arc(x,y,9,0,Math.PI*2); ctx.fill(); ctx.fillStyle="#fff"; ctx.fillText(String(i+1),x,y+4); }); } }
   const coul=Object.fromEntries(FAM_KEYS.map(k=>[k,css("--f-"+k)]));
   const rad=Math.max(2,Math.min(5,vue.s*4))+(sat?0.5:0);
   if(sat){ ctx.strokeStyle="rgba(255,255,255,.95)"; ctx.lineWidth=1.2; }
   for(const l of lieux){ if(!filtres[l.f]) continue; const [x,y]=versEcran(...proj(l.lat,l.lon));
     if(x<-10||y<-10||x>w+10||y>h+10) continue; ctx.fillStyle=coul[l.f]; ctx.beginPath(); ctx.arc(x,y,rad,0,Math.PI*2); ctx.fill(); if(sat) ctx.stroke(); }
+  if(coucheEvt){ for(const e of evenementsZone(zone)){ if(!isFinite(e.lat)) continue; const [x,y]=versEcran(...proj(e.lat,e.lon)), s2=e.precision==="rue"?7:5;
+      ctx.fillStyle=e.gravite>=4?"#dc2626":e.gravite>=3?"#ea7a1a":"#e3b505"; ctx.strokeStyle="#fff"; ctx.lineWidth=1.5;
+      ctx.beginPath(); ctx.moveTo(x,y-s2); ctx.lineTo(x+s2,y); ctx.lineTo(x,y+s2); ctx.lineTo(x-s2,y); ctx.closePath(); ctx.fill(); ctx.stroke(); } }
   if(selection){ const [x,y]=versEcran(...proj(selection.lat,selection.lon)); ctx.strokeStyle=sat?"#fff":css("--fg"); ctx.lineWidth=2; ctx.beginPath(); ctx.arc(x,y,rad+5,0,Math.PI*2); ctx.stroke(); }
   /* échelle */
   const m=[50,100,200,500,1000].find(v=>v*vue.s>70)||1000, coulTxt=sat?"#fff":css("--fg");
@@ -1367,14 +1800,26 @@ cv.addEventListener("pointerup",finPointeur); cv.addEventListener("pointercancel
 cv.addEventListener("wheel",e=>{ e.preventDefault(); zoomer(e.deltaY<0?1.2:1/1.2,e.offsetX,e.offsetY); },{passive:false});
 function choisir(px,py){
   if(!zone) return; let best=null,bd=16;
+  if(coucheEvt){ let be=null, de=14; for(const e of evenementsZone(zone)){ if(!isFinite(e.lat)) continue; const [x,y]=versEcran(...proj(e.lat,e.lon)), d=Math.hypot(x-px,y-py); if(d<de){ de=d; be=e; } }
+    if(be){ selection=null; redessiner(); $("info").innerHTML=`<b>${esc(be.typeLib)}</b> · ${new Date(be.date).toLocaleDateString("fr-FR")} · ${esc(be.lieu||"")} (${be.precision})<br><a href="${esc(be.lien)}" target="_blank" rel="noopener">${esc(be.titre)}</a>`; return; } }
+  if(coucheDanger){ const d=danger(); if(d){ const i=d.chauds.findIndex(hh=>{ const [x,y]=versEcran(...proj(hh.lat,hh.lon)); return Math.hypot(x-px,y-py)<12; });
+    if(i>=0){ const hh=d.chauds[i]; $("info").innerHTML=`<b>Secteur dangereux n° ${i+1}</b> · ${esc(hh.rue||"sans nom")} · ${fmt(hh.part,1)} % du risque de la zone (× ${fmt(hh.ratio,1)} la moyenne) · ${hh.nAcc} accident(s), ${hh.nEv} événement(s)`; return; } } }
   for(const l of lieux){ if(!filtres[l.f]) continue; const [x,y]=versEcran(...proj(l.lat,l.lon)); const d=Math.hypot(x-px,y-py); if(d<bd){bd=d;best=l;} }
   selection=best; redessiner();
-  if(!best){ $("info").textContent="Aucun lieu à cet endroit."; return; }
+  if(!best){ $("info").textContent=FAM_KEYS.some(k=>filtres[k])?"Aucun lieu à cet endroit.":"Aucun icône affiché : coche une famille de lieux ou active une couche."; return; }
   let etat="";
   const now=new Date(), j=(now.getDay()+6)%7;
   etat= ouvert(best,j,now.getHours())? (best._oh?"ouvert maintenant (horaires déclarés)":"probablement ouvert (horaires présumés)") : (best._oh?"fermé maintenant (horaires déclarés)":"probablement fermé (horaires présumés)");
   $("info").innerHTML=`<b>${esc(best.n||"Sans nom")}</b> · ${esc(nomType(best.t))} · ${FAMILLES[best.f]} · ${etat}${best.oh?` · <span class="muted">${esc(best.oh)}</span>`:""}`;
 }
+function majCouches(){ $("btnCoucheDanger").setAttribute("aria-pressed",String(coucheDanger)); $("btnCoucheEvt").setAttribute("aria-pressed",String(coucheEvt)); $("legendeDanger").hidden=!(coucheDanger||coucheEvt); redessiner(); }
+$("btnCoucheDanger").addEventListener("click",()=>{ coucheDanger=!coucheDanger; majCouches(); rendrePredictions(); });
+$("btnCoucheEvt").addEventListener("click",()=>{ coucheEvt=!coucheEvt; majCouches(); if(coucheEvt&&!evenements.length) log("Aucun événement chargé : utilise « Charger l'actualité ».","w"); });
+$("btnTousLieux").addEventListener("click",()=>{ FAM_KEYS.forEach(k=>filtres[k]=true); rendreLegende(); redessiner(); });
+$("btnAucunLieu").addEventListener("click",()=>{ FAM_KEYS.forEach(k=>filtres[k]=false); rendreLegende(); redessiner(); });
+$("btnActu").addEventListener("click",chargerActualite);
+$("pred").addEventListener("click",e=>{ const p=e.target.closest("button[data-periode]"); if(p){ periodeDanger=p.dataset.periode; rendrePredictions(); redessiner(); return; }
+  if(e.target.closest("#btnCoucheDanger2")||e.target.closest("#btnSynCarte")){ coucheDanger=!coucheDanger; majCouches(); rendrePredictions(); if(coucheDanger) document.getElementById("hMonde")?.scrollIntoView?.({behavior:"smooth"}); } });
 function rendreLegende(){
   $("legend").innerHTML=FAM_KEYS.map(k=>`<label><input type="checkbox" id="flt-${k}" ${filtres[k]?"checked":""}><span class="sw" style="background:var(--f-${k})"></span>${FAMILLES[k]}${zone&&zone.stats?` (${zone.stats.parFamille[k]||0})`:""}</label>`).join("");
   FAM_KEYS.forEach(k=>$("flt-"+k).addEventListener("change",e=>{filtres[k]=e.target.checked;redessiner();}));
@@ -1385,7 +1830,7 @@ function toutAfficher(recadrer){
   $("pillZone").className=zone?"pill ok":"pill";
   if(zone&&!lieux.length&&!rues.length) $("info").textContent="Zone sans carte : intègre le résultat du lien A.";
   else if(zone&&!selection) $("info").textContent=`${lieux.length} lieux · ${rues.length} segments de rue. Touche un point pour l'identifier.`;
-  rendreLegende(); rendreAnalyse(); rendrePredictions(); if(recadrer) ajusterVue(); redessiner(); rendreZones();
+  rendreLegende(); rendreAnalyse(); rendrePredictions(); rendreEvenements(); if(recadrer) ajusterVue(); redessiner(); rendreZones();
 }
 
 /* ===================== Mémoire en ligne ===================== */
@@ -1590,6 +2035,16 @@ const OUTILS=[
   execute(){ return zonesMem.map(z=>({nom:z.nom,id:z.id,rayon_m:z.rayon,lieux:z.stats?Object.values(z.stats.parFamille).reduce((a,b)=>a+b,0):0,
     densite_km2:z.stats?Math.round(Object.values(z.stats.parFamille).reduce((a,b)=>a+b,0)/z.stats.aire):null,par_famille:z.stats?.parFamille||null,
     score_couverture:z.stats?.score??null,km_voies:z.stats?+z.stats.kmTotal.toFixed(2):null,releves:(z.historique||[]).length,meteo:!!z.meteo})); }},
+ {name:"danger", description:"Carte de danger probable de la zone active : secteurs les plus dangereux (rue, coordonnées, part du risque en %, multiple de la moyenne, accidents et événements proches, contributions), validation sur les accidents 2024, fiabilité, et délinquance enregistrée de la commune (SSMSI). Argument optionnel periode : tout, jour ou nuit.",
+  inputSchema:{type:"object",properties:{periode:{type:"string"}}},
+  execute(i){ exigerZone(); const p=["tout","jour","nuit"].includes(i.periode)?i.periode:"tout"; const d=calculerDanger(zone,p); if(!d) throw new Error("pas de carte intégrée");
+    const D=zone.enrich&&zone.enrich.delinquance;
+    return {periode:p,secteurs:d.chauds,accidents_utilises:d.nAcc,evenements_utilises:d.nEv,poids_pct:d.poids,validation:d.validation,fiabilite_pct:d.fiab,
+      delinquance_commune:D?{code:D.code,annee:D.annee,indicateurs:D.indicateurs.slice(0,14).map(x=>({indicateur:x.indicateur,taux_pour_mille:x.taux,taux_annee_precedente:x.tauxPrec}))}:null}; }},
+ {name:"evenements", description:"Événements d'actualité issus d'Actu17, analysés par Predictor (date, type, gravité 1-5, titre, lieu, précision rue/commune/département, lien). Argument optionnel portee : zone (par défaut) ou tous ; limite (max 60).",
+  inputSchema:{type:"object",properties:{portee:{type:"string"},limite:{type:"number"}}},
+  execute(i){ const L=(i.portee==="tous"?evenements:evenementsZone(zone)).slice().reverse().slice(0,Math.max(1,Math.min(60,Number(i.limite)||30)));
+    return {total:evenements.length,dans_zone:zone?evenementsZone(zone).length:0,evenements:L.map(e=>({date:e.date.slice(0,10),type:e.typeLib,gravite:e.gravite,titre:e.titre,resume:e.resume,lieu:e.lieu||null,precision:e.precision,lien:e.lien}))}; }},
  {name:"etat_technique", description:"État technique de Predictor : version, mémoire, réseau, appareil, zone active, volumes de données, erreurs et journal récents.",
   execute(){ return etatTechnique(); }}
 ];
@@ -1600,6 +2055,8 @@ Règles :
 - Appuie-toi uniquement sur les outils de Predictor ; appelle-les avant de conclure. N'invente aucun chiffre.
 - Tu n'as pas accès au web : si une information manque, dis quelle collecte (lien A carte, lien B météo, fichier C régional .osm.pbf, « Enrichir la zone » pour la démographie, la météo passée et les comptages réels) la fournirait.
 - Quand des mesures réelles existent (outil mesures_reelles), privilégie le modèle calé et cite sa précision mesurée sur jours de test.
+- Pour le danger, parle de probabilité relative d'incidents à un endroit, cite les sources (accidents BAAC, événements Actu17, terrain, statistiques SSMSI) et la fiabilité ; ne stigmatise aucune population.
+- Pour les événements, ne cite ni ne recherche aucun nom de personne (victimes, suspects) : type, lieu, date, source uniquement.
 - Donne la fiabilité de chaque prédiction et distingue mesure, donnée déclarée et estimation.
 - Ne cherche ni ne déduis d'informations sur des personnes identifiables.
 Contexte : nous sommes le ${new Date().toLocaleString("fr-FR")} (heure de Paris). Zone active : ${zone?`${zone.nom} (${lieux.length} lieux, météo ${zone.meteo?"présente":"absente"})`:"aucune"}. Zones en mémoire : ${zonesMem.length}.`;
@@ -1648,7 +2105,7 @@ function rendreRapports(){
 /* ===================== Connexion mémoire ===================== */
 (async()=>{
   const c=window.claude;
-  if(!c||!c.use){ $("pillDb").textContent="Mémoire : hors ligne"; $("pillDb").className="pill bad"; desactiverIA("Claude n'est joignable que lorsque Predictor est ouvert dans Claude."); rendreZones(); return; }
+  if(!c||!c.use){ $("pillDb").textContent="Mémoire : hors ligne"; $("pillDb").className="pill bad"; desactiverIA("Claude n'est joignable que lorsque Predictor est ouvert dans Claude."); rendreZones(); evenements=await lireEvenements(); rendreEvenements(); return; }
   c.use("sample").then(async sp=>{
     if(!sp){ desactiverIA("Claude n'est pas disponible sur cet affichage."); return; }
     sample=sp; try{ const lim=await sp.limits(); outilsDispo=lim&&lim.tools?Math.min(OUTILS.length,lim.tools.maxCount||0):0; }catch(e){ outilsDispo=0; }
@@ -1658,8 +2115,8 @@ function rendreRapports(){
     log("Claude connecté"+(outilsDispo?` avec accès direct à ${outilsDispo} modules.`:" (sans accès direct aux modules : les données lui sont transmises dans chaque question)."),"o");
   });
   const [d,u]=await Promise.all([c.use("db"),c.use("user")]);
-  if(!d){ $("pillDb").textContent="Mémoire : hors ligne"; $("pillDb").className="pill bad"; log("Mémoire en ligne indisponible sur cet affichage.","w"); rendreZones(); return; }
-  db=d;
+  if(!d){ $("pillDb").textContent="Mémoire : hors ligne"; $("pillDb").className="pill bad"; log("Mémoire en ligne indisponible sur cet affichage.","w"); rendreZones(); evenements=await lireEvenements(); rendreEvenements(); return; }
+  db=d; evenements=await lireEvenements(); rendreEvenements();
   if(u){ try{ const w=await u.can("data.write"); if(w===false) peutEcrire=false; }catch(e){} }
   $("pillDb").textContent=peutEcrire?"Mémoire : connectée":"Mémoire : lecture seule"; $("pillDb").className=peutEcrire?"pill ok":"pill warn";
   log("Mémoire en ligne connectée.","o");
