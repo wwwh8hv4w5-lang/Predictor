@@ -2,11 +2,11 @@
 
 Logiciel d'analyse de données et de prédiction sur un monde réel virtualisé, développé par **F.S.M Game House**.
 
-Version actuelle : **v2.0**
+Version actuelle : **v3.0**
 
 ## Utilisation
 
-Un écran, une barre de recherche. Tape une adresse, un quartier ou une ville : Predictor localise le lieu, rassemble tout seul les données (carte, météo, population, accidents, délinquance, actualité, comptages) et rédige un rapport clair de la situation de la zone, avec une carte des lieux à surveiller et la fiabilité de chaque partie.
+Predictor est un appui pour toute personne qui arrive dans une ville ou un village qu'elle ne connaît pas. Tape une adresse, un lieu ou une ville (suggestions pendant la frappe), ou touche « Autour de moi » : sans autre action, Predictor trouve aussitôt autour du point l'eau potable, les toilettes, de quoi recharger son téléphone, le Wi-Fi gratuit, la pharmacie, les urgences, les défibrillateurs, la police, les distributeurs, de quoi manger, les transports, un abri, l'information, un hébergement, la poste et les douches ou laveries — avec distance, temps à pied, ouverture et itinéraire — puis la carte, la météo, la sécurité, l'actualité et les prédictions.
 
 ## Ce que fait Predictor
 
@@ -34,6 +34,7 @@ Le fichier `.github/workflows/actu17.yml` recopie toutes les heures les flux lis
 - INSEE via geo.api.gouv.fr, Licence Ouverte
 - Ville de Paris, open data (comptages vélo et routiers), licence ODbL
 - Extraits régionaux : Geofabrik
+- Géocodage : Base Adresse Nationale (api-adresse.data.gouv.fr), Photon (Komoot), Open-Meteo, Nominatim
 - Accidents corporels de la circulation (BAAC, ONISR) et délinquance enregistrée (SSMSI) via data.gouv.fr, Licence Ouverte
 - Actualité : flux RSS public d'Actu17 et des sources ajoutées (titres, liens et extraits) ; GDELT Project (titres et liens des articles de presse, base ouverte)
 - Photos aériennes : IGN Géoplateforme (Licence Ouverte) ; Esri World Imagery (© Esri, Maxar, Earthstar Geographics)
