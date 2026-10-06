@@ -2,7 +2,7 @@
 
 Logiciel d'analyse de données et de prédiction sur un monde réel virtualisé, développé par **F.S.M Game House**.
 
-Version actuelle : **v1.1**
+Version actuelle : **v1.2**
 
 ## Ce que fait Predictor
 
