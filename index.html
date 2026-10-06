@@ -1,0 +1,1109 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Predictor v0.6</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+<style>
+/* Layout : une colonne de modules techniques (zone, monde, analyse, prédiction, mémoire, journal), interface brute de développement */
+:root{
+  --bg:#eef1f4; --panel:#ffffff; --fg:#18212c; --muted:#5b6876; --line:#cdd5de;
+  --accent:#2c5a86; --accent-fg:#ffffff; --ok:#2e7d4f; --warn:#a86a12; --bad:#b03a32;
+  --street-main:#3a4654; --street-local:#8a96a3; --street-foot:#b9c3cc; --ring:#2c5a86;
+  --f-alimentation:#2e8b57; --f-restauration:#d0632b; --f-commerce:#7a4fb5; --f-sante:#c23b4a;
+  --f-transport:#1f7fbf; --f-education:#b08a12; --f-services:#5a6b7d; --f-loisirs:#c2489a; --f-autres:#7d8a7a;
+  --font-ui:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-data:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#11161c; --panel:#18202a; --fg:#dde4ea; --muted:#93a1ae; --line:#2c3743;
+  --accent:#7fb0de; --accent-fg:#0d1620; --ok:#5fc08a; --warn:#e0a24a; --bad:#ec7a70;
+  --street-main:#c9d3dc; --street-local:#6c7a88; --street-foot:#3d4a57; --ring:#7fb0de;
+  --f-alimentation:#5cc48a; --f-restauration:#f08a52; --f-commerce:#a98be0; --f-sante:#f06b7a;
+  --f-transport:#5ab3ee; --f-education:#e0bd4a; --f-services:#9aabbd; --f-loisirs:#ec7cc6; --f-autres:#a7b3a3;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#11161c; --panel:#18202a; --fg:#dde4ea; --muted:#93a1ae; --line:#2c3743;
+  --accent:#7fb0de; --accent-fg:#0d1620; --ok:#5fc08a; --warn:#e0a24a; --bad:#ec7a70;
+  --street-main:#c9d3dc; --street-local:#6c7a88; --street-foot:#3d4a57; --ring:#7fb0de;
+  --f-alimentation:#5cc48a; --f-restauration:#f08a52; --f-commerce:#a98be0; --f-sante:#f06b7a;
+  --f-transport:#5ab3ee; --f-education:#e0bd4a; --f-services:#9aabbd; --f-loisirs:#ec7cc6; --f-autres:#a7b3a3;
+  color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--font-ui);font-size:14px;line-height:1.45}
+.wrap{max-width:980px;margin:0 auto;padding-inline:16px;padding-block:16px 40px;display:flex;flex-direction:column;gap:14px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px}
+h1{font-family:var(--font-data);font-size:20px;margin:0;letter-spacing:.06em}
+h1 small{font-size:12px;color:var(--muted);font-weight:400;letter-spacing:0}
+h2{font-family:var(--font-data);font-size:13px;text-transform:uppercase;letter-spacing:.08em;margin:0;color:var(--muted)}
+h3{font-size:13px;margin:0 0 4px}
+.pills{display:flex;flex-wrap:wrap;gap:6px}
+.pill{font-family:var(--font-data);font-size:11px;padding:2px 8px;border:1px solid var(--line);border-radius:3px;color:var(--muted)}
+.pill.ok{color:var(--ok);border-color:var(--ok)} .pill.bad{color:var(--bad);border-color:var(--bad)} .pill.warn{color:var(--warn);border-color:var(--warn)}
+section{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:12px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:end}
+.field{display:flex;flex-direction:column;gap:3px;min-width:0}
+label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+input,select,textarea,button{font:inherit;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:3px;padding:6px 8px}
+input[type=number]{width:7.5em}
+textarea{width:100%;box-sizing:border-box;min-height:90px;font-family:var(--font-data);font-size:12px}
+button{cursor:pointer;background:var(--panel)}
+button.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+button.danger{color:var(--bad);border-color:var(--bad)}
+button:disabled{opacity:.45;cursor:not-allowed}
+:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+a{color:var(--accent)}
+.muted{color:var(--muted)} .small{font-size:12px}
+.links{display:flex;flex-direction:column;gap:6px}
+.linkline{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+code,.mono{font-family:var(--font-data);font-size:12px}
+.canvas-box{position:relative;border:1px solid var(--line);border-radius:3px;overflow:hidden;background:var(--bg);touch-action:none}
+canvas{display:block;width:100%;height:440px}
+.legend{display:flex;flex-wrap:wrap;gap:6px}
+.legend label{display:flex;align-items:center;gap:5px;text-transform:none;letter-spacing:0;font-size:12px;color:var(--fg);border:1px solid var(--line);border-radius:3px;padding:2px 6px;cursor:pointer}
+.sw{width:9px;height:9px;border-radius:50%;display:inline-block}
+.info{font-family:var(--font-data);font-size:12px;min-height:1.4em}
+.scroll{overflow-x:auto;min-width:0}
+table{border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums;width:100%}
+th,td{border-bottom:1px solid var(--line);padding:4px 6px;text-align:left;white-space:nowrap}
+th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+td.num,th.num{text-align:right}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.grid2>div{min-width:0}
+.heat td{padding:0;width:16px;height:16px;border:1px solid var(--panel);text-align:center;font-size:9px}
+.heat th{font-size:10px;padding:0 3px;text-transform:none}
+.bar{height:6px;background:var(--line);border-radius:3px;overflow:hidden;min-width:60px}
+.bar>i{display:block;height:100%;background:var(--accent)}
+.rel{font-family:var(--font-data);font-size:11px;padding:1px 6px;border-radius:3px;border:1px solid currentColor}
+.rel.h{color:var(--ok)} .rel.m{color:var(--warn)} .rel.l{color:var(--bad)}
+.log{font-family:var(--font-data);font-size:11.5px;max-height:220px;overflow:auto;display:flex;flex-direction:column;gap:2px}
+.log .e{color:var(--bad)} .log .w{color:var(--warn)} .log .o{color:var(--ok)}
+.zones{display:flex;flex-direction:column;gap:6px}
+.zone{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:3px;padding:6px 8px}
+.zone.cur{border-color:var(--accent)}
+.ia-out{white-space:pre-wrap;font-size:13.5px;line-height:1.55;max-width:75ch;min-width:0;overflow-wrap:anywhere}
+.ia-out:empty{display:none}
+.tool{font-family:var(--font-data);font-size:11px;color:var(--muted)}
+details.rap summary{cursor:pointer}
+details.rap .ia-out{margin-top:6px}
+.zone .meta{min-width:0}
+.empty{color:var(--muted);font-size:13px;padding:8px 0}
+.kpis{display:flex;flex-wrap:wrap;gap:16px}
+.kpi{display:flex;flex-direction:column}
+.kpi b{font-family:var(--font-data);font-size:18px;font-variant-numeric:tabular-nums}
+.kpi span{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+<header>
+  <h1>PREDICTOR <small id="verTag">v0.6 · F.S.M Game House</small></h1>
+  <div class="pills">
+    <span class="pill" id="pillDb">Mémoire : …</span>
+    <span class="pill" id="pillNet">Réseau direct : non testé</span>
+    <span class="pill" id="pillZone">Aucune zone active</span>
+    <span class="pill" id="pillClaude">Claude : …</span>
+  </div>
+</header>
+
+<section id="secZone" aria-labelledby="hZone">
+  <h2 id="hZone">1 · Collecte</h2>
+  <div class="row">
+    <div class="field"><label for="selVille">Ville</label>
+      <select id="selVille"></select></div>
+    <div class="field"><label for="inLat">Latitude</label><input id="inLat" type="number" step="0.0001"></div>
+    <div class="field"><label for="inLon">Longitude</label><input id="inLon" type="number" step="0.0001"></div>
+    <div class="field"><label for="selRayon">Rayon</label>
+      <select id="selRayon"><option value="300">300 m</option><option value="500">500 m</option><option value="800" selected>800 m</option><option value="1000">1 km</option><option value="1500">1,5 km</option></select></div>
+    <div class="field" style="flex:1;min-width:140px"><label for="inNom">Nom de la zone</label><input id="inNom" type="text" placeholder="ex. Paris centre"></div>
+  </div>
+  <div class="row">
+    <button class="primary" id="btnPrep">Préparer la collecte</button>
+    <button id="btnDirect">Tenter la collecte directe</button>
+  </div>
+  <div class="links" id="linksBox" hidden>
+    <div class="linkline"><span class="mono">A · Carte (OpenStreetMap)</span> <a id="lnkCarte" href="#" target="_blank" rel="noopener">obtenir le fichier</a> <button id="cpCarte">Copier le lien</button></div>
+    <p class="small muted" style="margin:0">Le lien ouvre Overpass Turbo, qui lance la collecte de la zone tout seul (jusqu'à une minute ; accepte l'avertissement « beaucoup de données » s'il apparaît). Touche ensuite <b>Exporter</b>, puis le bouton <b>télécharger</b> de la ligne « données brutes » ou « GeoJSON ».</p>
+    <div class="linkline"><span class="mono">B · Météo (Open-Meteo)</span> <a id="lnkMeteo" href="#" target="_blank" rel="noopener">télécharger le fichier</a> <button id="cpMeteo">Copier le lien</button></div>
+    <p class="small muted" style="margin:0">Le lien télécharge directement un fichier CSV des prévisions.</p>
+    <div class="linkline"><span class="mono">C · Région complète (.osm.pbf)</span> <a id="lnkRegion" href="#" target="_blank" rel="noopener">télécharger le fichier régional</a></div>
+    <p class="small muted" style="margin:0">Fichier OpenStreetMap complet de la région, mis à jour chaque jour par Geofabrik (323 Mo pour l'Île-de-France). Predictor n'en extrait que la zone choisie ; la lecture prend une à quelques minutes. Un même fichier sert pour toutes les zones de la région.</p>
+    <p class="small muted" style="margin:0">Importe ensuite chaque fichier avec « ou fichier » ci-dessous : Predictor reconnaît seul la carte (données brutes, GeoJSON ou .osm.pbf) et la météo (CSV ou JSON).</p>
+  </div>
+  <div class="field"><label for="taImport">Données à intégrer</label>
+    <textarea id="taImport" placeholder="Ou colle ici le contenu d'un fichier (carte ou météo)"></textarea></div>
+  <div class="row">
+    <button class="primary" id="btnIntegrer">Intégrer</button>
+    <div class="field"><label for="fileImport">ou fichier</label><input id="fileImport" type="file"></div>
+  </div>
+  <div id="pbfBox" class="field" hidden>
+    <div class="bar" style="height:10px"><i id="pbfBar" style="width:0%"></i></div>
+    <div class="row"><span class="small mono" id="pbfTxt">Lecture…</span><button id="pbfStop">Arrêter la lecture</button></div>
+  </div>
+</section>
+
+<section aria-labelledby="hMonde">
+  <h2 id="hMonde">2 · Monde virtualisé</h2>
+  <div class="legend" id="legend"></div>
+  <div class="canvas-box"><canvas id="cv" aria-label="Carte virtualisée de la zone"></canvas></div>
+  <div class="row"><button id="zIn" aria-label="Zoomer">+</button><button id="zOut" aria-label="Dézoomer">−</button><button id="zFit">Recentrer</button><span class="small muted">Glisser pour se déplacer · pincer ou molette pour zoomer · toucher un point pour l'identifier</span></div>
+  <div class="info" id="info">Aucune zone chargée. Prépare une collecte ou ouvre une zone en mémoire.</div>
+</section>
+
+<section aria-labelledby="hAna">
+  <h2 id="hAna">3 · Analyse</h2>
+  <div id="ana"><p class="empty">L'analyse apparaîtra dès qu'une carte sera intégrée.</p></div>
+</section>
+
+<section aria-labelledby="hPred">
+  <h2 id="hPred">4 · Prédictions</h2>
+  <div id="pred"><p class="empty">Les prédictions utilisent la carte (fréquentation) et la météo. Intègre au moins l'une des deux.</p></div>
+</section>
+
+<section aria-labelledby="hMem">
+  <h2 id="hMem">5 · Mémoire en ligne</h2>
+  <div class="zones" id="zones"><p class="empty">Connexion à la mémoire…</p></div>
+</section>
+
+<section aria-labelledby="hIa">
+  <h2 id="hIa">6 · Claude · agent d'analyse</h2>
+  <p class="small muted" style="margin:0">Claude interroge directement les modules de Predictor (zone, lieux, fréquentation, météo, historique, mémoire, état technique) pour répondre. Il n'a pas accès au web : il travaille uniquement sur les données collectées. Chaque question utilise ton forfait Claude.</p>
+  <div class="row" id="iaPresets">
+    <button data-q="Fais le rapport technique complet de la zone active : volumes de données, qualité et couverture des données, services, réseau de voies, points faibles, fiabilité des prédictions.">Rapport technique de la zone</button>
+    <button data-q="Quels services essentiels manquent ou sont rares dans la zone active, et où se situent les manques ?">Manques en services</button>
+    <button data-q="Quels sont les meilleurs et les pires créneaux de la semaine pour circuler dans la zone, en tenant compte de la météo prévue ?">Créneaux de la semaine</button>
+    <button data-q="Fais un diagnostic technique de Predictor : état de la mémoire, du réseau, des droits, de l'appareil et erreurs récentes du journal.">Diagnostic du logiciel</button>
+  </div>
+  <div class="field"><label for="iaQ">Question à Claude</label><textarea id="iaQ" style="min-height:60px" placeholder="ex. Compare les deux zones en mémoire"></textarea></div>
+  <div class="row"><button class="primary" id="iaGo">Demander à Claude</button><button id="iaStop" hidden>Arrêter</button><button id="iaNew">Nouvelle conversation</button><span class="small muted" id="iaEtat"></span></div>
+  <div id="iaOut" class="ia-out" aria-live="polite"></div>
+  <h3>Rapports enregistrés</h3>
+  <div id="iaRapports" class="zones"><p class="empty">Les réponses de Claude sont enregistrées ici et dans la mémoire en ligne.</p></div>
+</section>
+
+<section aria-labelledby="hLog">
+  <h2 id="hLog">7 · Journal</h2>
+  <div class="row"><button id="btnDiag">Envoyer l'état technique à Claude</button><span class="small muted">Enregistre l'état du logiciel dans la mémoire, lisible par Claude depuis vos conversations.</span></div>
+  <div class="log" id="log" aria-live="polite"></div>
+</section>
+</div>
+
+<script>
+"use strict";
+/* ===================== Constantes ===================== */
+const VERSION = "0.6"; /* version unique du projet : incrémentée à chaque évolution */
+const VILLES = [
+ ["Paris",48.8566,2.3522],["Lyon",45.7640,4.8357],["Marseille",43.2965,5.3698],["Toulouse",43.6047,1.4442],
+ ["Nice",43.7102,7.2620],["Nantes",47.2184,-1.5536],["Strasbourg",48.5734,7.7521],["Montpellier",43.6108,3.8767],
+ ["Bordeaux",44.8378,-0.5792],["Lille",50.6292,3.0573],["Rennes",48.1173,-1.6778],["Reims",49.2583,4.0317],
+ ["Toulon",43.1242,5.9280],["Grenoble",45.1885,5.7245],["Dijon",47.3220,5.0415],["Angers",47.4784,-0.5632],
+ ["Le Havre",49.4944,0.1079],["Brest",48.3904,-4.4861],["Clermont-Ferrand",45.7772,3.0870],["Tours",47.3941,0.6848],
+ ["Rouen",49.4432,1.0999],["Nancy",48.6921,6.1844],["Metz",49.1193,6.1757],["Avignon",43.9493,4.8055],
+ ["Bruxelles",50.8503,4.3517],["Genève",46.2044,6.1432]
+];
+const FAMILLES = {
+ alimentation:"Alimentation", restauration:"Restauration", commerce:"Commerce", sante:"Santé",
+ transport:"Transport", education:"Éducation", services:"Services", loisirs:"Loisirs & tourisme", autres:"Autres"
+};
+const FAM_KEYS = Object.keys(FAMILLES);
+const SHOP_ALIM = new Set("supermarket convenience bakery butcher greengrocer deli cheese seafood pastry beverages wine alcohol frozen_food confectionery organic farm chocolate coffee tea spices".split(" "));
+const AM_REST = new Set("restaurant cafe bar pub fast_food ice_cream food_court biergarten".split(" "));
+const AM_SANTE = new Set("pharmacy doctors dentist hospital clinic nursing_home".split(" "));
+const AM_EDU = new Set("school kindergarten college university library childcare language_school music_school driving_school prep_school".split(" "));
+const AM_TRANS = new Set("bus_station ferry_terminal taxi bicycle_rental car_sharing parking fuel charging_station car_rental motorcycle_parking".split(" "));
+const AM_SERV = new Set("bank atm post_office townhall police fire_station courthouse social_facility community_centre place_of_worship marketplace bureau_de_change veterinary post_depot".split(" "));
+const AM_LOIS = new Set("cinema theatre arts_centre nightclub casino events_venue planetarium".split(" "));
+const AM_SKIP = new Set("bench waste_basket waste_disposal recycling parking_space bicycle_parking vending_machine drinking_water telephone clock post_box grit_bin hunting_stand shelter parking_entrance loading_dock fountain toilets photo_booth smoking_area".split(" "));
+const LEIS_SKIP = new Set("picnic_table outdoor_seating firepit bleachers".split(" "));
+const NOMS_TYPES = {
+ supermarket:"supermarché",convenience:"supérette",bakery:"boulangerie",butcher:"boucherie",greengrocer:"primeur",
+ restaurant:"restaurant",cafe:"café",bar:"bar",pub:"pub",fast_food:"restauration rapide",ice_cream:"glacier",
+ pharmacy:"pharmacie",doctors:"médecin",dentist:"dentiste",hospital:"hôpital",clinic:"clinique",
+ school:"école",kindergarten:"maternelle",college:"lycée/collège",university:"université",library:"bibliothèque",
+ bus_stop:"arrêt de bus",station:"gare/station",subway_entrance:"entrée de métro",tram_stop:"arrêt de tram",
+ bicycle_rental:"vélos en libre-service",parking:"parking",fuel:"station-service",charging_station:"borne de recharge",
+ bank:"banque",atm:"distributeur",post_office:"bureau de poste",townhall:"mairie",police:"police",
+ place_of_worship:"lieu de culte",marketplace:"marché",cinema:"cinéma",theatre:"théâtre",museum:"musée",
+ hotel:"hôtel",hostel:"auberge",attraction:"attraction",park:"parc",playground:"aire de jeux",
+ sports_centre:"centre sportif",fitness_centre:"salle de sport",pitch:"terrain de sport",garden:"jardin",
+ clothes:"vêtements",hairdresser:"coiffeur",beauty:"beauté",florist:"fleuriste",books:"librairie",
+ shoes:"chaussures",optician:"opticien",jewelry:"bijouterie",mobile_phone:"téléphonie",nightclub:"discothèque",
+ office:"bureau",viewpoint:"point de vue",artwork:"œuvre d'art",gallery:"galerie",information:"information touristique"
+};
+const WMO = {0:"Ciel clair",1:"Peu nuageux",2:"Partiellement nuageux",3:"Couvert",45:"Brouillard",48:"Brouillard givrant",
+ 51:"Bruine légère",53:"Bruine",55:"Bruine dense",56:"Bruine verglaçante",57:"Bruine verglaçante",61:"Pluie faible",63:"Pluie",65:"Forte pluie",
+ 66:"Pluie verglaçante",67:"Pluie verglaçante",71:"Neige faible",73:"Neige",75:"Forte neige",77:"Grains de neige",
+ 80:"Averses faibles",81:"Averses",82:"Fortes averses",85:"Averses de neige",86:"Fortes averses de neige",
+ 95:"Orage",96:"Orage avec grêle",99:"Orage avec forte grêle"};
+const JOURS = ["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"];
+const DAYCODES = {Mo:0,Tu:1,We:2,Th:3,Fr:4,Sa:5,Su:6};
+
+/* Profils horaires d'activité (0-1) par famille : points clés interpolés */
+function profil(points){ const a=new Array(24).fill(0);
+  for(let h=0;h<24;h++){ let p0=points[0],p1=points[points.length-1];
+    for(let i=0;i<points.length-1;i++){ if(h>=points[i][0]&&h<=points[i+1][0]){p0=points[i];p1=points[i+1];break;} }
+    a[h]= p1[0]===p0[0]?p0[1]: p0[1]+(p1[1]-p0[1])*(h-p0[0])/(p1[0]-p0[0]); }
+  return a; }
+const PROFILS = {
+ alimentation: profil([[0,0],[7,.1],[9,.6],[12,.75],[14,.45],[17,.8],[18,1],[19,.85],[21,.2],[23,0]]),
+ restauration: profil([[0,.15],[6,0],[8,.35],[10,.3],[12,.95],[13,1],[15,.3],[18,.45],[20,.95],[22,.6],[23,.35]]),
+ commerce:     profil([[0,0],[9,.1],[10,.45],[12,.6],[14,.55],[16,.8],[18,.9],[19,.5],[20,.1],[23,0]]),
+ sante:        profil([[0,0],[8,.3],[10,.9],[12,.7],[14,.6],[16,.85],[18,.6],[19,.2],[21,0],[23,0]]),
+ transport:    profil([[0,.05],[5,.1],[7,.7],[8,1],[9,.6],[12,.5],[16,.6],[18,1],[19,.7],[22,.3],[23,.15]]),
+ education:    profil([[0,0],[7,.2],[8,1],[11,.7],[12,.5],[14,.7],[16,.9],[17,.4],[19,0],[23,0]]),
+ services:     profil([[0,0],[8,.2],[9,.7],[11,.9],[12,.5],[14,.7],[16,.8],[17,.4],[18,.1],[23,0]]),
+ loisirs:      profil([[0,.2],[7,.05],[10,.4],[14,.7],[16,.8],[19,.9],[21,.8],[23,.4]]),
+ autres:       profil([[0,0],[8,.2],[10,.6],[12,.6],[15,.6],[18,.5],[20,.1],[23,0]])
+};
+const JOUR_FACT = { /* Lun..Dim */
+ alimentation:[1,1,1,1,1.1,1.35,.45], restauration:[.8,.85,.9,1,1.2,1.3,1], commerce:[.85,.9,.95,.95,1.05,1.45,.2],
+ sante:[1.1,1,1,1,1,.4,.08], transport:[1.05,1,1,1,1.05,.75,.6], education:[1,1,.7,1,1,.1,0],
+ services:[1.05,1,1,1,1,.35,.05], loisirs:[.7,.75,.85,.9,1.1,1.45,1.35], autres:[1,1,1,1,1,.8,.3]
+};
+/* Horaires présumés quand le lieu n'en déclare pas : [ouverture, fermeture, jours ouverts] */
+const HORAIRES_DEF = {
+ alimentation:[8,20,[1,1,1,1,1,1,0]], restauration:[11,23,[1,1,1,1,1,1,1]], commerce:[10,19,[1,1,1,1,1,1,0]],
+ sante:[9,19,[1,1,1,1,1,1,0]], transport:[5,24,[1,1,1,1,1,1,1]], education:[8,17,[1,1,1,1,1,0,0]],
+ services:[9,17,[1,1,1,1,1,0,0]], loisirs:[10,22,[1,1,1,1,1,1,1]], autres:[9,18,[1,1,1,1,1,1,0]]
+};
+const FIAB_METEO = [92,88,82,74,65,56,48];
+
+/* ===================== État ===================== */
+let db=null, peutEcrire=true, zone=null, lieux=[], rues=[], selection=null;
+const filtres = Object.fromEntries(FAM_KEYS.map(k=>[k,true]));
+const $ = id=>document.getElementById(id);
+const esc = s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmt = (n,d=0)=>Number(n).toLocaleString("fr-FR",{maximumFractionDigits:d,minimumFractionDigits:d});
+
+/* ===================== Journal ===================== */
+let journal=[], journalTimer=null;
+function log(msg,kind=""){
+  const t=new Date(); const ts=t.toLocaleTimeString("fr-FR");
+  journal.push({t:t.toISOString(),k:kind,m:msg,v:VERSION}); if(journal.length>150) journal=journal.slice(-150);
+  const d=document.createElement("div"); d.className=kind; d.textContent=`[${ts}] [v${VERSION}] ${msg}`; $("log").prepend(d);
+  if(db&&peutEcrire){ clearTimeout(journalTimer); journalTimer=setTimeout(()=>ecrire(db.doc("systeme/journal"),{lignes:journal,maj:new Date().toISOString(),version:VERSION}).catch(()=>{}),2500); }
+}
+
+/* ===================== File d'écriture (une écriture à la fois) ===================== */
+let chaine=Promise.resolve();
+function ecrire(ref,data){ const p=chaine.then(()=>ref.set(data)); chaine=p.catch(()=>{}); return p; }
+function supprimer(ref){ const p=chaine.then(()=>ref.delete()); chaine=p.catch(()=>{}); return p; }
+function erreurDb(e){ const c=e&&e.code;
+  if(c==="quota_exceeded") return "mémoire pleine : supprime une ancienne zone puis recommence";
+  if(c==="invalid_argument") return "écriture refusée (droits insuffisants ou données invalides)";
+  if(c==="resource_exhausted") return "trop d'opérations d'un coup, réessaie dans un instant";
+  return "mémoire momentanément indisponible ("+(c||"inconnu")+")"; }
+
+/* ===================== Classification ===================== */
+function classer(tags){
+  if(!tags) return null;
+  if(tags.shop){ return {f:SHOP_ALIM.has(tags.shop)?"alimentation":"commerce", t:tags.shop}; }
+  const am=tags.amenity;
+  if(am){
+    if(AM_SKIP.has(am)) return null;
+    if(AM_REST.has(am)) return {f:"restauration",t:am};
+    if(AM_SANTE.has(am)) return {f:"sante",t:am};
+    if(AM_EDU.has(am)) return {f:"education",t:am};
+    if(AM_TRANS.has(am)) return {f:"transport",t:am};
+    if(AM_SERV.has(am)) return {f:"services",t:am};
+    if(AM_LOIS.has(am)) return {f:"loisirs",t:am};
+    return {f:"autres",t:am};
+  }
+  if(tags.healthcare) return {f:"sante",t:tags.healthcare};
+  if(tags.highway==="bus_stop") return {f:"transport",t:"bus_stop"};
+  if(tags.railway) return {f:"transport",t:tags.railway};
+  if(tags.public_transport) return {f:"transport",t:tags.public_transport};
+  if(tags.tourism) return {f:"loisirs",t:tags.tourism};
+  if(tags.leisure){ if(LEIS_SKIP.has(tags.leisure)) return null; return {f:"loisirs",t:tags.leisure}; }
+  if(tags.office) return {f:"services",t:"office"};
+  return null;
+}
+const nomType = t=>NOMS_TYPES[t]||String(t).replace(/_/g," ");
+function groupeRue(h){
+  if(/^(motorway|trunk|primary|secondary)(_link)?$/.test(h)) return "p";
+  if(/^(pedestrian|footway|path|cycleway|steps|track|bridleway|corridor)$/.test(h)) return "f";
+  return "l";
+}
+
+/* ===================== Horaires d'ouverture (opening_hours, cas courants) ===================== */
+function parseHoraires(s){
+  if(!s||typeof s!=="string") return null;
+  s=s.trim(); if(s==="24/7") return Array.from({length:7},()=>[[0,1440]]);
+  const sem=Array.from({length:7},()=>[]); let ok=false;
+  for(let regle of s.split(";")){
+    regle=regle.trim(); if(!regle) continue;
+    if(/^(PH|SH)\b/.test(regle)||regle.includes('"')) continue;
+    let jours=[0,1,2,3,4,5,6], plages=regle;
+    const m=regle.match(/^((?:Mo|Tu|We|Th|Fr|Sa|Su)(?:\s*[-,]\s*(?:Mo|Tu|We|Th|Fr|Sa|Su))*)(?:\s*,\s*PH)?\s+(.+)$/);
+    if(m){ jours=[]; for(const part of m[1].split(",")){ const r=part.trim().split("-").map(x=>DAYCODES[x.trim()]);
+        if(r.some(x=>x===undefined)) return null;
+        if(r.length===1) jours.push(r[0]); else { let d=r[0]; for(let k=0;k<7;k++){ jours.push(d); if(d===r[1]) break; d=(d+1)%7; } } }
+      plages=m[2].trim(); }
+    else if(/^(Mo|Tu|We|Th|Fr|Sa|Su)/.test(regle)) return null;
+    if(/^(off|closed)$/i.test(plages)){ for(const j of jours) sem[j]=[]; ok=true; continue; }
+    const res=[];
+    for(const p of plages.split(",")){ const t=p.trim().match(/^(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})\+?$/);
+      if(!t) return null; const a=+t[1]*60+ +t[2]; let b=+t[3]*60+ +t[4]; if(b<=a) b=1440; res.push([a,Math.min(b,1440)]); }
+    for(const j of jours) sem[j]=res.slice(); ok=true;
+  }
+  return ok?sem:null;
+}
+function ouvert(lieu,j,h){
+  const sem=lieu._oh;
+  if(sem){ const m=h*60+30; return sem[j].some(([a,b])=>m>=a&&m<b); }
+  const d=HORAIRES_DEF[lieu.f]; return d[2][j]===1&&h>=d[0]&&h<d[1];
+}
+
+/* ===================== Projection locale ===================== */
+function proj(lat,lon){ const c=Math.cos(zone.lat*Math.PI/180);
+  return [(lon-zone.lon)*111320*c,(lat-zone.lat)*110540]; }
+
+/* ===================== Intégration des données ===================== */
+function zoneDepuisForm(){
+  const lat=parseFloat($("inLat").value), lon=parseFloat($("inLon").value), r=parseInt($("selRayon").value,10);
+  if(!isFinite(lat)||!isFinite(lon)||Math.abs(lat)>90||Math.abs(lon)>180){ log("Coordonnées invalides : renseigne une latitude et une longitude.","e"); return null; }
+  const nom=($("inNom").value.trim()||$("selVille").value||"Zone").slice(0,60);
+  const id=(nom.normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")||"zone")+"_"+lat.toFixed(4)+"_"+lon.toFixed(4)+"_r"+r;
+  return {id,nom,lat,lon,rayon:r};
+}
+function requeteOverpass(z){
+  const a=`(around:${z.rayon},${z.lat},${z.lon})`;
+  return `[out:json][timeout:90];(way["highway"]${a};);out geom;(node["amenity"]${a};node["shop"]${a};node["tourism"]${a};node["leisure"]${a};node["healthcare"]${a};node["office"]${a};node["public_transport"="station"]${a};node["railway"~"^(station|halt|tram_stop|subway_entrance)$"]${a};node["highway"="bus_stop"]${a};way["amenity"]${a};way["shop"]${a};way["tourism"]${a};way["leisure"]${a};);out center tags;`;
+}
+function urlCarte(z){ return "https://overpass-api.de/api/interpreter?data="+encodeURIComponent(requeteOverpass(z)); }
+function urlCarteFichier(z){ return "https://overpass-turbo.eu/?Q="+encodeURIComponent(requeteOverpass(z))+"&C="+z.lat+";"+z.lon+";15&R"; }
+function urlRegion(z){ return (z.lat>48.1&&z.lat<49.25&&z.lon>1.4&&z.lon<3.6)?"https://download.geofabrik.de/europe/france/ile-de-france-latest.osm.pbf":"https://download.geofabrik.de/europe/france.html"; }
+function urlMeteoFichier(z){ return urlMeteo(z)+"&format=csv"; }
+function urlMeteo(z){ return `https://api.open-meteo.com/v1/forecast?latitude=${z.lat}&longitude=${z.lon}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max&hourly=temperature_2m,precipitation_probability,weather_code&timezone=Europe%2FParis&forecast_days=7`; }
+
+function zoneCible(){
+  const f=zoneDepuisForm(); if(!f) return null;
+  if(zone&&zone.id===f.id) return zone;
+  if(zone&&!$("inNom").value.trim()&&Math.abs(zone.lat-f.lat)<1e-4&&Math.abs(zone.lon-f.lon)<1e-4&&zone.rayon===f.rayon) return zone;
+  return {...f,creeLe:new Date().toISOString(),historique:[],meteo:null,stats:null};
+}
+
+function integrerCarte(json,z){
+  const L=[],R=[]; let ign=0;
+  for(const el of json.elements||[]){
+    const tg=el.tags||{};
+    if(el.type==="way"&&tg.highway&&Array.isArray(el.geometry)){
+      const pts=el.geometry.filter(p=>p&&isFinite(p.lat)&&isFinite(p.lon));
+      if(pts.length>1) R.push({g:groupeRue(tg.highway),h:tg.highway,n:tg.name||"",p:pts.map(p=>[p.lat,p.lon])});
+      continue;
+    }
+    const c=classer(tg); if(!c){ign++;continue;}
+    const lat=el.type==="node"?el.lat:el.center&&el.center.lat, lon=el.type==="node"?el.lon:el.center&&el.center.lon;
+    if(!isFinite(lat)||!isFinite(lon)){ign++;continue;}
+    L.push({id:el.type[0]+el.id,f:c.f,t:c.t,n:tg.name||"",lat,lon,oh:tg.opening_hours||""});
+  }
+  if(!L.length&&!R.length) throw new Error("aucun lieu ni aucune rue dans ces données");
+  const dedup=new Map(); for(const l of L) dedup.set(l.id,l);
+  return {lieux:[...dedup.values()],rues:R,ignores:ign};
+}
+
+function integrerMeteo(json){
+  const d=json.daily, h=json.hourly;
+  if(!d||!Array.isArray(d.time)) throw new Error("format météo inattendu");
+  return {
+    recupereLe:new Date().toISOString(), version:VERSION,
+    jours:d.time.map((t,i)=>({date:t,code:d.weather_code?.[i],tmax:d.temperature_2m_max?.[i],tmin:d.temperature_2m_min?.[i],
+      pluie:d.precipitation_sum?.[i],probPluie:d.precipitation_probability_max?.[i],vent:d.wind_speed_10m_max?.[i]})),
+    heures: h&&Array.isArray(h.time)? h.time.slice(0,48).map((t,i)=>({t,temp:h.temperature_2m?.[i],prob:h.precipitation_probability?.[i],code:h.weather_code?.[i]})) : []
+  };
+}
+
+/* ===================== Lecteur OSM PBF (.osm.pbf, sans bibliothèque) ===================== */
+/* Lit le fichier bloc par bloc et ne garde que la zone demandée : nœuds dans la zone, lieux, rues. */
+const PBF_CHUNK=32*1024*1024;
+async function decompresser(u8){
+  if(typeof DecompressionStream==="function"){
+    const st=new Blob([u8]).stream().pipeThrough(new DecompressionStream("deflate"));
+    return new Uint8Array(await new Response(st).arrayBuffer());
+  }
+  if(window.pako) return window.pako.inflate(u8);
+  throw new Error("ce navigateur ne sait pas décompresser les données (mise à jour du système nécessaire)");
+}
+function pbfVarint(b,s){ let r=0,m=1,x; do{ x=b[s.p++]; r+=(x&0x7f)*m; m*=128; }while(x&0x80); return r>=9223372036854775808?r-18446744073709551616:r; }
+function pbfSkip(b,s,w){ if(w===0) pbfVarint(b,s); else if(w===1) s.p+=8; else if(w===2){ const l=pbfVarint(b,s); s.p+=l; } else if(w===5) s.p+=4; else throw new Error("structure PBF invalide"); }
+/* Parcourt un message : appelle f(champ, typeFil, état) ; f doit consommer la valeur ou renvoyer false pour la sauter */
+function pbfMsg(b,start,end,f){ const s={p:start}; while(s.p<end){ const k=pbfVarint(b,s), fld=Math.floor(k/8), w=k&7; if(!f(fld,w,s)) pbfSkip(b,s,w); } }
+function pbfLd(b,s){ const l=pbfVarint(b,s), a=s.p; s.p+=l; return [a,a+l]; }
+function pbfPacked(b,s,w,signe,out){ /* lit un champ répété, compacté ou non */
+  if(w===2){ const [a,e]=pbfLd(b,s), t={p:a}; while(t.p<e){ const v=pbfVarint(b,t); out.push(signe?(v%2?-(v+1)/2:v/2):v); } }
+  else { const v=pbfVarint(b,s); out.push(signe?(v%2?-(v+1)/2:v/2):v); }
+  return true;
+}
+const pbfTxt=new TextDecoder();
+
+function pbfBloc(b,ctx){
+  const strs=[]; const groupes=[]; let gran=100,latOff=0,lonOff=0;
+  pbfMsg(b,0,b.length,(f,w,s)=>{
+    if(f===1&&w===2){ const [a,e]=pbfLd(b,s); pbfMsg(b,a,e,(g,w2,t)=>{ if(g===1&&w2===2){ strs.push(pbfLd(b,t)); return true; } return false; }); return true; }
+    if(f===2&&w===2){ groupes.push(pbfLd(b,s)); return true; }
+    if(f===17&&w===0){ gran=pbfVarint(b,s); return true; }
+    if(f===19&&w===0){ latOff=pbfVarint(b,s); return true; }
+    if(f===20&&w===0){ lonOff=pbfVarint(b,s); return true; }
+    return false;
+  });
+  const cache=new Array(strs.length);
+  const str=i=>cache[i]??(cache[i]=pbfTxt.decode(b.subarray(strs[i][0],strs[i][1])));
+  const deg=(off,v)=>1e-9*(off+gran*v);
+  const Z=ctx.bbox;
+  const noeud=(id,lat,lon,tags)=>{
+    if(lat<Z.s||lat>Z.n||lon<Z.w||lon>Z.e) return;
+    ctx.noeuds.set(id,[lat,lon]); ctx.nbNoeuds++;
+    if(tags&&tags.n) ctx.elements.push({type:"node",id,lat,lon,tags:tags.o});
+  };
+  for(const [ga,ge] of groupes){
+    pbfMsg(b,ga,ge,(f,w,s)=>{
+      if(f===2&&w===2){ /* DenseNodes */
+        ctx.phase="noeuds";
+        const [a,e]=pbfLd(b,s); let ids=null,lats=null,lons=null,kv=null;
+        pbfMsg(b,a,e,(g,w2,t)=>{ if(w2!==2) return false;
+          if(g===1){ ids=pbfLd(b,t); return true; } if(g===8){ lats=pbfLd(b,t); return true; }
+          if(g===9){ lons=pbfLd(b,t); return true; } if(g===10){ kv=pbfLd(b,t); return true; } return false; });
+        if(!ids||!lats||!lons) return true;
+        const si={p:ids[0]}, sl={p:lats[0]}, so={p:lons[0]}, sk=kv?{p:kv[0]}:null;
+        let id=0,la=0,lo=0;
+        while(si.p<ids[1]){
+          let v=pbfVarint(b,si); id+=v%2?-(v+1)/2:v/2;
+          v=pbfVarint(b,sl); la+=v%2?-(v+1)/2:v/2;
+          v=pbfVarint(b,so); lo+=v%2?-(v+1)/2:v/2;
+          const lat=deg(latOff,la), lon=deg(lonOff,lo);
+          const dedans=!(lat<Z.s||lat>Z.n||lon<Z.w||lon>Z.e);
+          let tags=null;
+          if(sk&&sk.p<kv[1]){ let k; while((k=pbfVarint(b,sk))!==0){ const val=pbfVarint(b,sk); if(dedans){ tags??={n:0,o:{}}; tags.o[str(k)]=str(val); tags.n++; } } }
+          if(dedans) noeud(id,lat,lon,tags);
+        }
+        return true;
+      }
+      if(f===1&&w===2){ /* Node simple */
+        ctx.phase="noeuds";
+        const [a,e]=pbfLd(b,s); let id=0,la=0,lo=0; const ks=[],vs=[];
+        pbfMsg(b,a,e,(g,w2,t)=>{ if(g===1){ const v=pbfVarint(b,t); id=v%2?-(v+1)/2:v/2; return true; }
+          if(g===2) return pbfPacked(b,t,w2,false,ks); if(g===3) return pbfPacked(b,t,w2,false,vs);
+          if(g===8){ const v=pbfVarint(b,t); la=v%2?-(v+1)/2:v/2; return true; } if(g===9){ const v=pbfVarint(b,t); lo=v%2?-(v+1)/2:v/2; return true; } return false; });
+        const o={}; ks.forEach((k,i)=>o[str(k)]=str(vs[i]));
+        noeud(id,deg(latOff,la),deg(lonOff,lo),ks.length?{n:ks.length,o}:null);
+        return true;
+      }
+      if(f===3&&w===2){ /* Way */
+        ctx.phase="voies"; ctx.nbVoiesLues++;
+        const [a,e]=pbfLd(b,s); let id=0; const ks=[],vs=[],dr=[];
+        pbfMsg(b,a,e,(g,w2,t)=>{ if(g===1){ id=pbfVarint(b,t); return true; }
+          if(g===2) return pbfPacked(b,t,w2,false,ks); if(g===3) return pbfPacked(b,t,w2,false,vs);
+          if(g===8) return pbfPacked(b,t,w2,true,dr); return false; });
+        if(!ks.length) return true;
+        let ref=0, touche=false; const refs=new Array(dr.length);
+        for(let i=0;i<dr.length;i++){ ref+=dr[i]; refs[i]=ref; if(!touche&&ctx.noeuds.has(ref)) touche=true; }
+        if(!touche) return true;
+        const tags={}; ks.forEach((k,i)=>tags[str(k)]=str(vs[i]));
+        if(tags.highway){
+          let seg=[]; const flush=()=>{ if(seg.length>1) ctx.elements.push({type:"way",id:id+"-"+ctx.elements.length,tags,geometry:seg}); seg=[]; };
+          for(const r of refs){ const c=ctx.noeuds.get(r); if(c) seg.push({lat:c[0],lon:c[1]}); else flush(); }
+          flush();
+        } else {
+          let sla=0,slo=0,n=0; for(const r of refs){ const c=ctx.noeuds.get(r); if(c){ sla+=c[0]; slo+=c[1]; n++; } }
+          if(n) ctx.elements.push({type:"way",id,center:{lat:sla/n,lon:slo/n},tags});
+        }
+        return true;
+      }
+      if(f===4&&w===2){ ctx.relations=true; return false; }
+      return false;
+    });
+  }
+}
+
+async function lirePBF(file,z,progres,signal){
+  const marge=z.rayon*1.15, dLat=marge/110540, dLon=marge/(111320*Math.cos(z.lat*Math.PI/180));
+  const ctx={bbox:{s:z.lat-dLat,n:z.lat+dLat,w:z.lon-dLon,e:z.lon+dLon},noeuds:new Map(),elements:[],nbNoeuds:0,nbVoiesLues:0,phase:"début",relations:false};
+  let pos=0, cStart=0, chunk=new Uint8Array(0), nbBlocs=0;
+  const assurer=async(p,len)=>{ if(p<cStart||p+len>cStart+chunk.length){ cStart=p; const fin=Math.min(file.size,p+Math.max(len,PBF_CHUNK)); chunk=new Uint8Array(await file.slice(p,fin).arrayBuffer()); if(p+len>cStart+chunk.length) throw new Error("fichier tronqué : le téléchargement semble incomplet"); } };
+  const vue=(p,len)=>chunk.subarray(p-cStart,p-cStart+len);
+  while(pos<file.size){
+    if(signal&&signal.aborted) throw new Error("lecture arrêtée");
+    await assurer(pos,4); const h=vue(pos,4); const hl=((h[0]<<24)>>>0)+(h[1]<<16)+(h[2]<<8)+h[3];
+    if(hl<=0||hl>65536) throw new Error("ce fichier n'est pas un .osm.pbf valide");
+    await assurer(pos+4,hl); const hb=vue(pos+4,hl); let type="",taille=0;
+    pbfMsg(hb,0,hb.length,(f,w,s)=>{ if(f===1&&w===2){ const [a,e]=pbfLd(hb,s); type=pbfTxt.decode(hb.subarray(a,e)); return true; } if(f===3&&w===0){ taille=pbfVarint(hb,s); return true; } return false; });
+    if(!type) throw new Error("ce fichier n'est pas un .osm.pbf valide");
+    await assurer(pos+4+hl,taille); const bl=vue(pos+4+hl,taille);
+    if(type==="OSMData"){
+      let brut=null, comp=null, autre=false;
+      pbfMsg(bl,0,bl.length,(f,w,s)=>{ if(f===1&&w===2){ const [a,e]=pbfLd(bl,s); brut=bl.subarray(a,e); return true; } if(f===3&&w===2){ const [a,e]=pbfLd(bl,s); comp=bl.subarray(a,e); return true; } if((f===4||f===6||f===7)&&w===2){ autre=true; } return false; });
+      if(!brut&&!comp){ if(autre) throw new Error("compression du fichier non prise en charge (seule la compression zlib l'est)"); }
+      else { const donnees=brut||await decompresser(comp); pbfBloc(donnees,ctx); }
+      if(ctx.relations) break; /* fichier trié : plus rien d'utile après les relations */
+    }
+    pos+=4+hl+taille; nbBlocs++;
+    if(nbBlocs%8===0){ progres&&progres(pos/file.size,ctx); await new Promise(r=>setTimeout(r,0)); }
+  }
+  progres&&progres(1,ctx);
+  const cosL=Math.cos(z.lat*Math.PI/180), dans=(la,lo)=>Math.hypot((lo-z.lon)*111320*cosL,(la-z.lat)*110540)<=z.rayon;
+  const elements=ctx.elements.filter(e=>e.geometry||(e.center?dans(e.center.lat,e.center.lon):dans(e.lat,e.lon)));
+  return {elements,stats:{noeudsZone:ctx.nbNoeuds,voiesLues:ctx.nbVoiesLues,blocs:nbBlocs,arretAuxRelations:ctx.relations}};
+}
+
+/* GeoJSON (export Overpass Turbo) → éléments au format Overpass */
+function geojsonVersElements(gj){
+  const els=[];
+  (gj.features||[]).forEach((f,i)=>{
+    const pr=f.properties||{}, g=f.geometry; if(!g) return;
+    const tags=(pr.tags&&typeof pr.tags==="object")?pr.tags:Object.fromEntries(Object.entries(pr).filter(([k,v])=>!k.startsWith("@")&&k!=="id"&&typeof v!=="object"));
+    const ref=String(pr["@id"]||pr.id||f.id||("feature/"+i)); const [typ,num]=ref.includes("/")?ref.split("/"):["feature",ref];
+    const type=typ==="node"?"node":"way";
+    const lignes = g.type==="LineString"?[g.coordinates]: g.type==="MultiLineString"?g.coordinates: g.type==="Polygon"?[g.coordinates[0]]: g.type==="MultiPolygon"?g.coordinates.map(p=>p[0]):[];
+    if(g.type==="Point"){ els.push({type,id:num,lat:g.coordinates[1],lon:g.coordinates[0],tags,...(type==="way"?{center:{lat:g.coordinates[1],lon:g.coordinates[0]}}:{})}); return; }
+    if(!lignes.length) return;
+    if(tags.highway&&tags.highway!=="bus_stop"){ lignes.forEach((l,k)=>els.push({type:"way",id:num+(k?"-"+k:""),tags,geometry:l.map(c=>({lat:c[1],lon:c[0]}))})); return; }
+    let la=0,lo=0,n=0; for(const l of lignes) for(const c of l){ lo+=c[0]; la+=c[1]; n++; }
+    if(n) els.push({type:"way",id:num,center:{lat:la/n,lon:lo/n},tags});
+  });
+  return {elements:els};
+}
+/* CSV Open-Meteo (format=csv) → objet au format JSON Open-Meteo */
+function csvMeteoVersJson(txt){
+  const blocs=txt.replace(/\r/g,"").split(/\n\s*\n/).map(b=>b.trim().split("\n").filter(Boolean)).filter(b=>b.length);
+  const out={};
+  for(const b of blocs){
+    const cols=b[0].split(",").map(c=>c.split(" (")[0].trim());
+    if(cols[0]==="latitude"){ const v=(b[1]||"").split(","); out.latitude=parseFloat(v[0]); out.longitude=parseFloat(v[1]); continue; }
+    if(cols[0]!=="time") continue;
+    const obj={}; cols.forEach(c=>obj[c]=[]);
+    for(const ligne of b.slice(1)){ const v=ligne.split(","); cols.forEach((c,k)=>{ const x=(v[k]??"").trim(); obj[c].push(c==="time"?x:(x===""?null:parseFloat(x))); }); }
+    if(cols.some(c=>c.endsWith("_max")||c.endsWith("_min")||c.endsWith("_sum"))) out.daily=obj; else out.hourly=obj;
+  }
+  return out;
+}
+function lireDonnees(texte){
+  const t=texte.replace(/^﻿/,"").trim();
+  if(t.startsWith("{")||t.startsWith("[")){ const j=JSON.parse(t); return j&&j.type==="FeatureCollection"?geojsonVersElements(j):j; }
+  if(/^latitude,longitude/i.test(t)||/^time,/m.test(t)) return csvMeteoVersJson(t);
+  throw new Error("format inconnu");
+}
+async function traiterImport(texte){
+  let json; try{ json=lireDonnees(texte); }catch(e){ log("Fichier illisible : ce n'est ni une carte (données brutes, GeoJSON ou .osm.pbf) ni une météo (CSV ou JSON). Vérifie que le téléchargement est complet.","e"); return; }
+  return traiterJson(json);
+}
+let pbfCtl=null;
+async function importerPBF(f){
+  const z=zoneCible(); if(!z) return;
+  if(pbfCtl){ log("Une lecture de fichier est déjà en cours.","w"); return; }
+  pbfCtl=new AbortController(); $("pbfBox").hidden=false; $("pbfBar").style.width="0%"; $("btnIntegrer").disabled=true;
+  log(`Lecture de ${f.name} (${fmt(f.size/1048576,0)} Mo) pour « ${z.nom} » (rayon ${z.rayon} m)…`);
+  const t0=Date.now();
+  try{
+    const r=await lirePBF(f,z,(p,c)=>{ $("pbfBar").style.width=(100*p).toFixed(1)+"%";
+      $("pbfTxt").textContent=`${Math.round(100*p)} % · ${c.phase==="voies"?"lecture des voies":"lecture des nœuds"} · ${fmt(c.nbNoeuds)} nœuds dans la zone · ${Math.round((Date.now()-t0)/1000)} s`; },pbfCtl.signal);
+    log(`Fichier lu en ${Math.round((Date.now()-t0)/1000)} s : ${fmt(r.stats.noeudsZone)} nœuds dans la zone, ${fmt(r.stats.voiesLues)} voies examinées.`,"o");
+    if(!r.elements.length){ log("Aucune donnée trouvée dans la zone : ce fichier ne couvre pas cette zone. Vérifie la ville choisie et le fichier régional.","e"); return; }
+    await traiterJson({elements:r.elements},"fichier .osm.pbf");
+  }catch(e){ log("Lecture du fichier .osm.pbf impossible : "+(e&&e.message||e)+".","e"); }
+  finally{ pbfCtl=null; $("pbfBox").hidden=true; $("btnIntegrer").disabled=false; }
+}
+$("pbfStop").addEventListener("click",()=>pbfCtl?.abort());
+async function traiterJson(json,source){
+  const z=zoneCible(); if(!z) return;
+  if(Array.isArray(json.elements)){
+    let res; try{ res=integrerCarte(json,z); }catch(e){ log("Carte non intégrée : "+e.message+". Vérifie que le lien correspond à cette zone.","e"); return; }
+    zone=z; lieux=res.lieux.map(prepLieu); rues=res.rues;
+    zone.majCarte=new Date().toISOString();
+    zone.stats=analyser();
+    zone.historique=(zone.historique||[]).concat([{date:zone.majCarte,total:lieux.length,parFamille:zone.stats.parFamille,kmRues:zone.stats.kmTotal,version:VERSION}]).slice(-50);
+    zone.sourceCarte=source||"Overpass";
+    log(`Carte intégrée depuis ${zone.sourceCarte} : ${lieux.length} lieux, ${rues.length} segments de rue (${res.ignores} éléments sans intérêt écartés).`,"o");
+    toutAfficher(true); await sauverZone(true);
+  } else if(json.daily){
+    let m; try{ m=integrerMeteo(json); }catch(e){ log("Météo non intégrée : "+e.message+".","e"); return; }
+    zone=z; zone.meteo=m;
+    if(json.latitude&&Math.abs(json.latitude-zone.lat)>0.2) log("Attention : ces prévisions semblent concerner un autre lieu que la zone active.","w");
+    log(`Météo intégrée : ${m.jours.length} jours de prévisions.`,"o");
+    if(!lieux.length&&zone.nLieuxChunks) await chargerDonnees(zone);
+    toutAfficher(false); await sauverZone(false);
+  } else log("Données non reconnues : ni carte OpenStreetMap ni météo Open-Meteo.","e");
+}
+function prepLieu(l){ l._oh=parseHoraires(l.oh); return l; }
+
+/* ===================== Collecte directe (testée, probablement bloquée) ===================== */
+let diagReseau={};
+async function sonder(nom,url,delai){
+  const t0=Date.now(), ctl=new AbortController(), t=setTimeout(()=>ctl.abort(),delai);
+  try{ const r=await fetch(url,{signal:ctl.signal,cache:"no-store"}); clearTimeout(t);
+    if(!r.ok) throw new Error("réponse HTTP "+r.status);
+    await r.text(); return {ok:true,ms:Date.now()-t0};
+  }catch(e){ clearTimeout(t);
+    const raison=e.name==="AbortError"?`pas de réponse en ${delai/1000} s`:(e.message||String(e));
+    return {ok:false,ms:Date.now()-t0,raison}; }
+}
+async function testerReseau(){
+  const contexte=window.claude?"dans Claude":(location.protocol==="file:"?"fichier local":location.host);
+  const [m,o]=await Promise.all([
+    sonder("Open-Meteo","https://api.open-meteo.com/v1/forecast?latitude=48.85&longitude=2.35&current=temperature_2m",15000),
+    sonder("OpenStreetMap","https://overpass-api.de/api/status",15000)]);
+  diagReseau={contexte,meteo:m,carte:o,date:new Date().toISOString()};
+  log(`Test réseau (${contexte}) · Open-Meteo : ${m.ok?"OK en "+m.ms+" ms":"échec, "+m.raison} · OpenStreetMap : ${o.ok?"OK en "+o.ms+" ms":"échec, "+o.raison}`,m.ok&&o.ok?"o":"w");
+  const ok=m.ok||o.ok; etatReseau=m.ok&&o.ok?"autorisé":ok?"partiel":"bloqué";
+  $("pillNet").textContent="Réseau direct : "+etatReseau; $("pillNet").className="pill "+(m.ok&&o.ok?"ok":ok?"warn":"bad");
+  return ok;
+}
+async function collecteDirecte(){
+  const z=zoneDepuisForm(); if(!z) return;
+  log("Tentative de collecte directe…");
+  await testerReseau();
+  if(!diagReseau.meteo.ok&&!diagReseau.carte.ok){ log("Collecte directe impossible : aucun service joignable depuis cette page (détail ci-dessus). Utilise les liens A, B ou C.","w"); preparer(); return; }
+  const taches=[]; if(diagReseau.carte.ok) taches.push(["carte",urlCarte(z)]); if(diagReseau.meteo.ok) taches.push(["météo",urlMeteo(z)]);
+  for(const [nom,u] of taches){
+    log(`Téléchargement direct de la ${nom}…`);
+    try{ const r=await fetch(u); if(!r.ok) throw new Error("réponse HTTP "+r.status); await traiterImport(await r.text()); }
+    catch(e){ log(`Échec du téléchargement direct de la ${nom} (${e.message||e}). Utilise le lien correspondant.`,"e"); }
+  }
+}
+
+/* ===================== Analyse ===================== */
+function distM(a,b){ const [x1,y1]=proj(a[0],a[1]),[x2,y2]=proj(b[0],b[1]); return Math.hypot(x2-x1,y2-y1); }
+function analyser(){
+  const aire=Math.PI*zone.rayon*zone.rayon/1e6;
+  const parFamille=Object.fromEntries(FAM_KEYS.map(k=>[k,0])), parType={};
+  let avecHoraires=0;
+  for(const l of lieux){ parFamille[l.f]++; parType[l.t]=(parType[l.t]||0)+1; if(l._oh) avecHoraires++; }
+  const km={p:0,l:0,f:0}; const nomsRues=new Set();
+  for(const r of rues){ let d=0; for(let i=1;i<r.p.length;i++) d+=distM(r.p[i-1],r.p[i]); km[r.g]+=d/1000; if(r.n) nomsRues.add(r.n); }
+  const essentiels=[
+    ["Pharmacie",l=>l.t==="pharmacy"],["Médecin / soins",l=>["doctors","clinic","hospital","dentist"].includes(l.t)],
+    ["Alimentation générale",l=>["supermarket","convenience","greengrocer","butcher"].includes(l.t)],["Boulangerie",l=>l.t==="bakery"],
+    ["Transport en commun",l=>["bus_stop","station","subway_entrance","tram_stop","halt","bus_station"].includes(l.t)],
+    ["École",l=>["school","kindergarten"].includes(l.t)],["Banque / poste",l=>["bank","atm","post_office"].includes(l.t)]
+  ].map(([nom,fn])=>[nom,lieux.filter(fn).length]);
+  const score=Math.round(100*essentiels.filter(e=>e[1]>0).length/essentiels.length);
+  return {aire,parFamille,parType,avecHoraires,km,kmTotal:km.p+km.l+km.f,nbRuesNommees:nomsRues.size,essentiels,score};
+}
+
+/* ===================== Prédictions ===================== */
+function activite(){
+  const g=Array.from({length:7},()=>new Array(24).fill(0));
+  for(const l of lieux){ const pr=PROFILS[l.f], jf=JOUR_FACT[l.f];
+    for(let j=0;j<7;j++) for(let h=0;h<24;h++) if(ouvert(l,j,h)) g[j][h]+=pr[h]*jf[j]; }
+  let max=0; for(const r of g) for(const v of r) max=Math.max(max,v);
+  return g.map(r=>r.map(v=>max?Math.round(100*v/max):0));
+}
+function fiabActivite(){ if(!lieux.length) return 0; const cov=zone.stats.avecHoraires/lieux.length;
+  return Math.round(Math.min(60,25+35*cov+(lieux.length>200?5:0))); }
+function facteurMeteo(j){
+  let f=1; const raisons=[];
+  if(j.probPluie>=60&&j.pluie>=2){ f*=0.85; raisons.push("pluie"); }
+  if(j.tmax>=32){ f*=0.9; raisons.push("forte chaleur"); }
+  if(j.tmax<=2){ f*=0.9; raisons.push("froid"); }
+  if(j.vent>=50){ f*=0.92; raisons.push("vent fort"); }
+  if(j.tmax>=18&&j.tmax<=27&&(j.probPluie??100)<30){ f*=1.08; raisons.push("temps agréable"); }
+  return {f,raisons};
+}
+const relClass = v=>v>=75?"h":v>=50?"m":"l";
+const relTexte = v=>v>=75?"élevée":v>=50?"moyenne":"faible";
+function badge(v){ return `<span class="rel ${relClass(v)}">${v} % · ${relTexte(v)}</span>`; }
+
+/* ===================== Rendu : analyse ===================== */
+function rendreAnalyse(){
+  const box=$("ana");
+  if(!zone||!zone.stats||!lieux.length&&!rues.length){ box.innerHTML='<p class="empty">L\'analyse apparaîtra dès qu\'une carte sera intégrée.</p>'; return; }
+  const s=zone.stats, tot=lieux.length||1;
+  const top=Object.entries(s.parType).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  box.innerHTML=`
+  <div class="kpis">
+    <div class="kpi"><b>${fmt(lieux.length)}</b><span>lieux</span></div>
+    <div class="kpi"><b>${fmt(lieux.length/s.aire,0)}</b><span>lieux / km²</span></div>
+    <div class="kpi"><b>${fmt(s.kmTotal,1)}</b><span>km de voies</span></div>
+    <div class="kpi"><b>${s.score}/100</b><span>couverture services</span></div>
+    <div class="kpi"><b>${fmt(100*s.avecHoraires/tot,0)} %</b><span>horaires connus</span></div>
+  </div>
+  <div class="grid2">
+    <div><h3>Répartition par famille</h3><div class="scroll"><table><thead><tr><th>Famille</th><th class="num">Nb</th><th class="num">/km²</th><th>Part</th></tr></thead><tbody>
+    ${FAM_KEYS.filter(k=>s.parFamille[k]).sort((a,b)=>s.parFamille[b]-s.parFamille[a]).map(k=>`<tr><td><span class="sw" style="background:var(--f-${k})"></span> ${FAMILLES[k]}</td><td class="num">${s.parFamille[k]}</td><td class="num">${fmt(s.parFamille[k]/s.aire,1)}</td><td><div class="bar"><i style="width:${100*s.parFamille[k]/tot}%"></i></div></td></tr>`).join("")}
+    </tbody></table></div></div>
+    <div><h3>Services essentiels</h3><div class="scroll"><table><thead><tr><th>Service</th><th class="num">Nb</th><th>État</th></tr></thead><tbody>
+    ${s.essentiels.map(([n,c])=>`<tr><td>${n}</td><td class="num">${c}</td><td>${c>0?'<span class="rel h">présent</span>':'<span class="rel l">absent</span>'}</td></tr>`).join("")}
+    </tbody></table></div></div>
+    <div><h3>Types les plus fréquents</h3><div class="scroll"><table><tbody>
+    ${top.map(([t,c])=>`<tr><td>${esc(nomType(t))}</td><td class="num">${c}</td></tr>`).join("")}
+    </tbody></table></div></div>
+    <div><h3>Réseau de voies</h3><div class="scroll"><table><tbody>
+      <tr><td>Axes principaux</td><td class="num">${fmt(s.km.p,1)} km</td></tr>
+      <tr><td>Rues locales</td><td class="num">${fmt(s.km.l,1)} km</td></tr>
+      <tr><td>Voies piétonnes et cyclables</td><td class="num">${fmt(s.km.f,1)} km</td></tr>
+      <tr><td>Rues nommées</td><td class="num">${s.nbRuesNommees}</td></tr>
+      <tr><td>Surface analysée</td><td class="num">${fmt(s.aire,2)} km²</td></tr>
+    </tbody></table></div></div>
+  </div>`;
+}
+
+/* ===================== Rendu : prédictions ===================== */
+function rendreTendances(){
+  const h=zone.historique||[];
+  if(h.length<2) return `<p class="small muted">Un seul relevé de carte pour cette zone. La tendance apparaîtra au prochain relevé (refais la collecte A dans quelques jours ou semaines).</p>`;
+  const a=h[h.length-2], b=h[h.length-1];
+  const lignes=FAM_KEYS.map(k=>{ const d=(b.parFamille[k]||0)-(a.parFamille[k]||0); return [k,a.parFamille[k]||0,b.parFamille[k]||0,d]; }).filter(r=>r[1]||r[2]);
+  return `<p class="small muted">Comparaison du relevé du ${new Date(a.date).toLocaleDateString("fr-FR")} avec celui du ${new Date(b.date).toLocaleDateString("fr-FR")}. Une variation peut venir d'un vrai changement ou d'une mise à jour d'OpenStreetMap.</p>
+  <div class="scroll"><table><thead><tr><th>Famille</th><th class="num">Avant</th><th class="num">Après</th><th class="num">Écart</th></tr></thead><tbody>
+  ${lignes.map(([k,x,y,d])=>`<tr><td>${FAMILLES[k]}</td><td class="num">${x}</td><td class="num">${y}</td><td class="num" style="color:var(${d>0?"--ok":d<0?"--bad":"--muted"})">${d>0?"+":""}${d}</td></tr>`).join("")}
+  </tbody></table></div>`;
+}
+function rendrePredictions(){
+  const box=$("pred");
+  if(!zone||(!lieux.length&&!zone.meteo)){ box.innerHTML='<p class="empty">Les prédictions utilisent la carte (fréquentation) et la météo. Intègre au moins l\'une des deux.</p>'; return; }
+  let html="";
+  const act=lieux.length?activite():null, fA=lieux.length?fiabActivite():0;
+  if(zone.meteo){
+    const jours=zone.meteo.jours, recup=new Date(zone.meteo.recupereLe);
+    const age=Math.floor((Date.now()-recup)/86400000);
+    html+=`<div><h3>Météo et activité prévues · 7 jours</h3>
+    <p class="small muted">Prévisions récupérées le ${recup.toLocaleString("fr-FR")}${age>=1?` (il y a ${age} j : la fiabilité baisse, refais la collecte B)`:""}.</p>
+    <div class="scroll"><table><thead><tr><th>Jour</th><th>Météo</th><th class="num">Min/Max</th><th class="num">Pluie</th><th class="num">Vent</th><th>Fiabilité météo</th>${act?"<th class=\"num\">Activité prévue</th><th>Fiabilité activité</th>":""}</tr></thead><tbody>
+    ${jours.map((j,i)=>{ const d=new Date(j.date+"T12:00:00"), wd=(d.getDay()+6)%7;
+      const fm=Math.max(20,FIAB_METEO[Math.min(i+Math.max(age,0),6)]-(i+age>6?10:0));
+      let actCell="";
+      if(act){ const moy=act[wd].reduce((s,v)=>s+v,0)/24; const fx=facteurMeteo(j);
+        actCell=`<td class="num">${fmt(moy*fx.f,0)}${fx.raisons.length?` <span class="small muted">(${fx.raisons.join(", ")})</span>`:""}</td><td>${badge(Math.round(Math.min(fA,fm)))}</td>`; }
+      return `<tr><td>${JOURS[wd]} ${d.getDate()}/${d.getMonth()+1}</td><td>${esc(WMO[j.code]??"—")}</td><td class="num">${fmt(j.tmin,0)}° / ${fmt(j.tmax,0)}°</td><td class="num">${fmt(j.pluie??0,1)} mm · ${j.probPluie??"—"} %</td><td class="num">${fmt(j.vent??0,0)} km/h</td><td>${badge(fm)}</td>${actCell}</tr>`; }).join("")}
+    </tbody></table></div></div>`;
+  }
+  if(act){
+    const pics=[]; act.forEach((r,j)=>r.forEach((v,h)=>pics.push([v,j,h]))); pics.sort((a,b)=>b[0]-a[0]);
+    const calmes=pics.filter(p=>p[2]>=8&&p[2]<=20).slice(-3);
+    html+=`<div><h3>Fréquentation estimée · semaine type</h3>
+    <p class="small muted">Indice 0 à 100 de l'activité probable dans la zone, calculé à partir des ${lieux.length} lieux, de leurs horaires (${fmt(100*zone.stats.avecHoraires/lieux.length,0)} % connus) et de profils types par catégorie. Fiabilité ${badge(fA)} : c'est un modèle, pas une mesure.</p>
+    <p class="small">Pics : ${pics.slice(0,3).map(p=>`<b>${JOURS[p[1]]} ${p[2]}h</b>`).join(" · ")} — Créneaux calmes en journée : ${calmes.map(p=>`${JOURS[p[1]]} ${p[2]}h`).join(" · ")}</p>
+    <div class="scroll"><table class="heat"><thead><tr><th></th>${Array.from({length:24},(_,h)=>`<th>${h}</th>`).join("")}</tr></thead><tbody>
+    ${act.map((r,j)=>`<tr><th>${JOURS[j]}</th>${r.map((v,h)=>`<td title="${JOURS[j]} ${h}h : ${v}" style="background:color-mix(in srgb,var(--accent) ${v}%,transparent);color:${v>55?"var(--accent-fg)":"var(--muted)"}">${v>=90?"●":""}</td>`).join("")}</tr>`).join("")}
+    </tbody></table></div></div>`;
+    html+=`<div><h3>Tendances</h3>${rendreTendances()}</div>`;
+  }
+  box.innerHTML=`<div style="display:flex;flex-direction:column;gap:14px">${html}</div>`;
+}
+
+/* ===================== Rendu : monde virtualisé ===================== */
+const cv=$("cv"), ctx=cv.getContext("2d");
+let vue={x:0,y:0,s:1};
+function css(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+function ajusterVue(){ const w=cv.clientWidth,h=cv.clientHeight; vue={x:0,y:0,s:zone?Math.min(w,h)/(zone.rayon*2.25):1}; }
+function versEcran(x,y){ return [cv.clientWidth/2+(x-vue.x)*vue.s, cv.clientHeight/2-(y-vue.y)*vue.s]; }
+function dessiner(){
+  const dpr=window.devicePixelRatio||1, w=cv.clientWidth, h=cv.clientHeight;
+  if(cv.width!==Math.round(w*dpr)||cv.height!==Math.round(h*dpr)){ cv.width=Math.round(w*dpr); cv.height=Math.round(h*dpr); }
+  ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,w,h);
+  ctx.fillStyle=css("--bg"); ctx.fillRect(0,0,w,h);
+  if(!zone){ ctx.fillStyle=css("--muted"); ctx.font="13px "+css("--font-ui"); ctx.textAlign="center"; ctx.fillText("Monde vide : aucune zone chargée",w/2,h/2); return; }
+  const [cx,cy]=versEcran(0,0);
+  ctx.strokeStyle=css("--ring"); ctx.setLineDash([5,5]); ctx.lineWidth=1; ctx.beginPath(); ctx.arc(cx,cy,zone.rayon*vue.s,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
+  const style={f:[css("--street-foot"),.8],l:[css("--street-local"),1.2],p:[css("--street-main"),2.4]};
+  for(const g of ["f","l","p"]){ ctx.strokeStyle=style[g][0]; ctx.lineWidth=Math.max(.5,style[g][1]*Math.min(2,Math.sqrt(vue.s*2))); ctx.beginPath();
+    for(const r of rues){ if(r.g!==g) continue; r.p.forEach((pt,i)=>{ const [x,y]=versEcran(...proj(pt[0],pt[1])); i?ctx.lineTo(x,y):ctx.moveTo(x,y); }); }
+    ctx.stroke(); }
+  const coul=Object.fromEntries(FAM_KEYS.map(k=>[k,css("--f-"+k)]));
+  const rad=Math.max(2,Math.min(5,vue.s*4));
+  for(const l of lieux){ if(!filtres[l.f]) continue; const [x,y]=versEcran(...proj(l.lat,l.lon));
+    if(x<-10||y<-10||x>w+10||y>h+10) continue; ctx.fillStyle=coul[l.f]; ctx.beginPath(); ctx.arc(x,y,rad,0,Math.PI*2); ctx.fill(); }
+  if(selection){ const [x,y]=versEcran(...proj(selection.lat,selection.lon)); ctx.strokeStyle=css("--fg"); ctx.lineWidth=2; ctx.beginPath(); ctx.arc(x,y,rad+5,0,Math.PI*2); ctx.stroke(); }
+  /* échelle */
+  const m=[50,100,200,500,1000].find(v=>v*vue.s>70)||1000; ctx.strokeStyle=css("--fg"); ctx.fillStyle=css("--fg"); ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(12,h-14); ctx.lineTo(12+m*vue.s,h-14); ctx.stroke(); ctx.font="11px "+css("--font-data"); ctx.textAlign="left"; ctx.fillText(m>=1000?m/1000+" km":m+" m",12,h-20);
+}
+let rafPending=false; function redessiner(){ if(rafPending) return; rafPending=true; requestAnimationFrame(()=>{rafPending=false;dessiner();}); }
+function zoomer(f,px,py){ const w=cv.clientWidth,h=cv.clientHeight; px??=w/2; py??=h/2;
+  const wx=vue.x+(px-w/2)/vue.s, wy=vue.y-(py-h/2)/vue.s; vue.s=Math.max(.02,Math.min(40,vue.s*f));
+  vue.x=wx-(px-w/2)/vue.s; vue.y=wy+(py-h/2)/vue.s; redessiner(); }
+const pointeurs=new Map(); let depl=0, pinch=null;
+cv.addEventListener("pointerdown",e=>{ cv.setPointerCapture(e.pointerId); pointeurs.set(e.pointerId,{x:e.offsetX,y:e.offsetY}); depl=0;
+  if(pointeurs.size===2){ const [a,b]=[...pointeurs.values()]; pinch=Math.hypot(a.x-b.x,a.y-b.y); } });
+cv.addEventListener("pointermove",e=>{ const p=pointeurs.get(e.pointerId); if(!p) return;
+  if(pointeurs.size===1){ const dx=e.offsetX-p.x, dy=e.offsetY-p.y; depl+=Math.abs(dx)+Math.abs(dy); vue.x-=dx/vue.s; vue.y+=dy/vue.s; redessiner(); }
+  p.x=e.offsetX; p.y=e.offsetY;
+  if(pointeurs.size===2&&pinch){ const [a,b]=[...pointeurs.values()]; const d=Math.hypot(a.x-b.x,a.y-b.y); depl+=99; zoomer(d/pinch,(a.x+b.x)/2,(a.y+b.y)/2); pinch=d; } });
+function finPointeur(e){ if(pointeurs.size===1&&depl<6&&e.type==="pointerup") choisir(e.offsetX,e.offsetY); pointeurs.delete(e.pointerId); if(pointeurs.size<2) pinch=null; }
+cv.addEventListener("pointerup",finPointeur); cv.addEventListener("pointercancel",finPointeur);
+cv.addEventListener("wheel",e=>{ e.preventDefault(); zoomer(e.deltaY<0?1.2:1/1.2,e.offsetX,e.offsetY); },{passive:false});
+function choisir(px,py){
+  if(!zone) return; let best=null,bd=16;
+  for(const l of lieux){ if(!filtres[l.f]) continue; const [x,y]=versEcran(...proj(l.lat,l.lon)); const d=Math.hypot(x-px,y-py); if(d<bd){bd=d;best=l;} }
+  selection=best; redessiner();
+  if(!best){ $("info").textContent="Aucun lieu à cet endroit."; return; }
+  let etat="";
+  const now=new Date(), j=(now.getDay()+6)%7;
+  etat= ouvert(best,j,now.getHours())? (best._oh?"ouvert maintenant (horaires déclarés)":"probablement ouvert (horaires présumés)") : (best._oh?"fermé maintenant (horaires déclarés)":"probablement fermé (horaires présumés)");
+  $("info").innerHTML=`<b>${esc(best.n||"Sans nom")}</b> · ${esc(nomType(best.t))} · ${FAMILLES[best.f]} · ${etat}${best.oh?` · <span class="muted">${esc(best.oh)}</span>`:""}`;
+}
+function rendreLegende(){
+  $("legend").innerHTML=FAM_KEYS.map(k=>`<label><input type="checkbox" id="flt-${k}" ${filtres[k]?"checked":""}><span class="sw" style="background:var(--f-${k})"></span>${FAMILLES[k]}${zone&&zone.stats?` (${zone.stats.parFamille[k]||0})`:""}</label>`).join("");
+  FAM_KEYS.forEach(k=>$("flt-"+k).addEventListener("change",e=>{filtres[k]=e.target.checked;redessiner();}));
+}
+
+function toutAfficher(recadrer){
+  $("pillZone").textContent=zone?`Zone : ${zone.nom} (${zone.rayon} m)`:"Aucune zone active";
+  $("pillZone").className=zone?"pill ok":"pill";
+  if(zone&&!lieux.length&&!rues.length) $("info").textContent="Zone sans carte : intègre le résultat du lien A.";
+  else if(zone&&!selection) $("info").textContent=`${lieux.length} lieux · ${rues.length} segments de rue. Touche un point pour l'identifier.`;
+  rendreLegende(); rendreAnalyse(); rendrePredictions(); if(recadrer) ajusterVue(); redessiner(); rendreZones();
+}
+
+/* ===================== Mémoire en ligne ===================== */
+const TAILLE_MORCEAU=180000;
+function morceler(items){ const res=[]; let cur=[],len=0;
+  for(const it of items){ const s=JSON.stringify(it).length; if(len+s>TAILLE_MORCEAU&&cur.length){res.push(cur);cur=[];len=0;} cur.push(it); len+=s+1; }
+  if(cur.length) res.push(cur); return res; }
+const r5=v=>Math.round(v*1e5);
+function encoderRue(r){ const c=[]; let pa=0,po=0; for(const [la,lo] of r.p){ const a=r5(la),o=r5(lo); c.push(a-pa,o-po); pa=a;po=o; } return [r.g,r.h,r.n,c]; }
+function decoderRue(e){ const p=[]; let a=0,o=0; for(let i=0;i<e[3].length;i+=2){ a+=e[3][i]; o+=e[3][i+1]; p.push([a/1e5,o/1e5]); } return {g:e[0],h:e[1],n:e[2],p}; }
+const encoderLieu=l=>[l.id,l.f,l.t,l.n,r5(l.lat),r5(l.lon),l.oh];
+const decoderLieu=e=>prepLieu({id:e[0],f:e[1],t:e[2],n:e[3],lat:e[4]/1e5,lon:e[5]/1e5,oh:e[6]});
+function metaZone(z){ const {id,nom,lat,lon,rayon,creeLe,majCarte,historique,meteo,stats,nLieuxChunks,nRuesChunks,sourceCarte}=z;
+  return JSON.parse(JSON.stringify({id,nom,lat,lon,rayon,creeLe,majCarte:majCarte||null,sourceCarte:sourceCarte||null,historique:historique||[],meteo:meteo||null,stats:stats||null,nLieuxChunks:nLieuxChunks||0,nRuesChunks:nRuesChunks||0,version:VERSION,maj:new Date().toISOString()})); }
+async function sauverZone(avecDonnees){
+  if(!db){ log("Mémoire en ligne indisponible : la zone reste en mémoire seulement le temps de cette visite.","w"); return; }
+  if(!peutEcrire){ log("Lecture seule : tu n'as pas le droit d'enregistrer dans cette mémoire.","w"); return; }
+  const z=zone, base=db.collection("zones").doc(z.id).collection("donnees");
+  try{
+    if(avecDonnees){
+      const ml=morceler(lieux.map(encoderLieu)), mr=morceler(rues.map(encoderRue));
+      const ancL=z.nLieuxChunks||0, ancR=z.nRuesChunks||0;
+      for(let i=0;i<ml.length;i++) await ecrire(base.doc("lieux-"+i),{items:ml[i],version:VERSION});
+      for(let i=0;i<mr.length;i++) await ecrire(base.doc("rues-"+i),{items:mr[i],version:VERSION});
+      for(let i=ml.length;i<ancL;i++) await supprimer(base.doc("lieux-"+i));
+      for(let i=mr.length;i<ancR;i++) await supprimer(base.doc("rues-"+i));
+      z.nLieuxChunks=ml.length; z.nRuesChunks=mr.length;
+    }
+    await ecrire(db.collection("zones").doc(z.id),metaZone(z));
+    log(`Zone « ${z.nom} » enregistrée en mémoire${avecDonnees?` (${(z.nLieuxChunks||0)+(z.nRuesChunks||0)} blocs de données)`:""}.`,"o");
+  }catch(e){ log("Enregistrement impossible : "+erreurDb(e)+".","e"); }
+}
+async function chargerDonnees(z){
+  const base=db.collection("zones").doc(z.id).collection("donnees");
+  const L=[],R=[];
+  for(let i=0;i<(z.nLieuxChunks||0);i++){ const s=await base.doc("lieux-"+i).get(); if(s.exists) for(const e of s.data().items||[]) L.push(decoderLieu(e)); }
+  for(let i=0;i<(z.nRuesChunks||0);i++){ const s=await base.doc("rues-"+i).get(); if(s.exists) for(const e of s.data().items||[]) R.push(decoderRue(e)); }
+  lieux=L; rues=R;
+}
+async function ouvrirZone(id){
+  const meta=zonesMem.find(z=>z.id===id); if(!meta) return;
+  log(`Chargement de « ${meta.nom} » depuis la mémoire…`);
+  try{
+    zone=JSON.parse(JSON.stringify(meta)); selection=null; lieux=[]; rues=[];
+    await chargerDonnees(zone);
+    if(lieux.length||rues.length) zone.stats=analyser();
+    $("inLat").value=zone.lat; $("inLon").value=zone.lon; $("selRayon").value=String(zone.rayon); $("inNom").value=zone.nom;
+    log(`« ${zone.nom} » chargée : ${lieux.length} lieux, ${rues.length} segments de rue.`,"o");
+    toutAfficher(true);
+  }catch(e){ log("Chargement impossible : "+erreurDb(e)+".","e"); }
+}
+let aSupprimer=null;
+async function supprimerZone(id){
+  const meta=zonesMem.find(z=>z.id===id); if(!meta) return;
+  const base=db.collection("zones").doc(id).collection("donnees");
+  try{
+    for(let i=0;i<(meta.nLieuxChunks||0);i++) await supprimer(base.doc("lieux-"+i));
+    for(let i=0;i<(meta.nRuesChunks||0);i++) await supprimer(base.doc("rues-"+i));
+    await supprimer(db.collection("zones").doc(id));
+    if(zone&&zone.id===id){ zone=null; lieux=[]; rues=[]; selection=null; toutAfficher(true); }
+    log(`Zone « ${meta.nom} » effacée de la mémoire.`,"o");
+  }catch(e){ log("Suppression impossible : "+erreurDb(e)+".","e"); }
+  aSupprimer=null;
+}
+let zonesMem=[];
+function rendreZones(){
+  const box=$("zones");
+  if(!db){ box.innerHTML='<p class="empty">Mémoire en ligne indisponible sur cet affichage. Ouvre Predictor depuis Claude en étant connecté.</p>'; return; }
+  if(!zonesMem.length){ box.innerHTML='<p class="empty">Mémoire vide. Chaque zone intégrée y sera enregistrée automatiquement, avec sa carte, sa météo et l\'historique de ses relevés.</p>'; return; }
+  box.innerHTML=zonesMem.map(z=>`<div class="zone ${zone&&zone.id===z.id?"cur":""}"><div class="meta"><b>${esc(z.nom)}</b> <span class="small muted mono">${z.lat.toFixed(4)}, ${z.lon.toFixed(4)} · ${z.rayon} m · v${esc(z.version||"?")}</span><br>
+    <span class="small muted">${z.stats?`${Object.values(z.stats.parFamille).reduce((a,b)=>a+b,0)} lieux · ${(z.historique||[]).length} relevé(s)`:"pas de carte"} · ${z.meteo?"météo du "+new Date(z.meteo.recupereLe).toLocaleDateString("fr-FR"):"pas de météo"}</span></div>
+    <div class="row">${aSupprimer===z.id?`<span class="small">Effacer définitivement ?</span><button class="danger" data-ok="${esc(z.id)}">Oui, effacer</button><button data-no="1">Annuler</button>`:`<button data-open="${esc(z.id)}">Ouvrir</button>${peutEcrire?`<button class="danger" data-del="${esc(z.id)}">Effacer</button>`:""}`}</div></div>`).join("");
+}
+$("zones").addEventListener("click",e=>{ const b=e.target.closest("button"); if(!b) return;
+  if(b.dataset.open) ouvrirZone(b.dataset.open);
+  else if(b.dataset.del){ aSupprimer=b.dataset.del; rendreZones(); }
+  else if(b.dataset.ok) supprimerZone(b.dataset.ok);
+  else if(b.dataset.no){ aSupprimer=null; rendreZones(); } });
+
+/* ===================== Interface ===================== */
+function preparer(){
+  const z=zoneDepuisForm(); if(!z) return;
+  $("lnkCarte").href=urlCarteFichier(z); $("lnkMeteo").href=urlMeteoFichier(z); $("lnkRegion").href=urlRegion(z); $("linksBox").hidden=false;
+  if(!zone||zone.id!==z.id){ const exist=zonesMem.find(m=>m.id===z.id);
+    if(exist) log(`Cette zone existe déjà en mémoire : ouvre-la pour ajouter un nouveau relevé à son historique.`,"w"); }
+  log(`Collecte préparée pour « ${z.nom} » (${z.lat.toFixed(4)}, ${z.lon.toFixed(4)}, rayon ${z.rayon} m).`);
+}
+function copier(id){ const url=$(id).href;
+  navigator.clipboard.writeText(url).then(()=>log("Lien copié.","o"),()=>{ $("taImport").value=url; $("taImport").select(); log("Copie automatique refusée : le lien est placé dans la zone de texte, copie-le à la main.","w"); }); }
+$("cpCarte").addEventListener("click",()=>copier("lnkCarte"));
+$("cpMeteo").addEventListener("click",()=>copier("lnkMeteo"));
+$("btnPrep").addEventListener("click",preparer);
+$("btnDirect").addEventListener("click",collecteDirecte);
+$("btnIntegrer").addEventListener("click",async()=>{ const t=$("taImport").value.trim(); if(!t){ log("Rien à intégrer : colle d'abord le résultat d'un lien.","w"); return; }
+  $("btnIntegrer").disabled=true; try{ await traiterImport(t); $("taImport").value=""; } finally{ $("btnIntegrer").disabled=false; } });
+$("fileImport").addEventListener("change",e=>{ const f=e.target.files[0]; if(!f) return;
+  if(/\.pbf$/i.test(f.name)){ importerPBF(f).finally(()=>{ e.target.value=""; }); return; }
+  const r=new FileReader();
+  r.onload=async()=>{ await traiterImport(String(r.result)); e.target.value=""; }; r.onerror=()=>log("Lecture du fichier impossible.","e"); r.readAsText(f); });
+$("zIn").addEventListener("click",()=>zoomer(1.4)); $("zOut").addEventListener("click",()=>zoomer(1/1.4));
+$("zFit").addEventListener("click",()=>{ajusterVue();redessiner();});
+$("selVille").innerHTML=VILLES.map(v=>`<option>${v[0]}</option>`).join("")+'<option value="">Autre (coordonnées)</option>';
+$("selVille").addEventListener("change",()=>{ const v=VILLES.find(x=>x[0]===$("selVille").value); if(v){ $("inLat").value=v[1]; $("inLon").value=v[2]; $("inNom").value=v[0]+" centre"; } else { $("inNom").value=""; } });
+$("inLat").value=VILLES[0][1]; $("inLon").value=VILLES[0][2]; $("inNom").value="Paris centre";
+new ResizeObserver(()=>redessiner()).observe(cv);
+window.matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change",redessiner);
+new MutationObserver(redessiner).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+$("verTag").textContent=`v${VERSION} · F.S.M Game House`; document.title=`Predictor v${VERSION}`;
+log(`Predictor v${VERSION} démarré.`);
+toutAfficher(false);
+testerReseau();
+
+
+/* ===================== État technique (lisible par Claude) ===================== */
+let etatReseau="non testé", etatClaude="non connecté";
+function etatTechnique(){
+  const err=journal.filter(l=>l.k==="e");
+  return {
+    version:VERSION, date:new Date().toISOString(),
+    memoire: db?(peutEcrire?"connectée":"lecture seule"):"hors ligne",
+    reseauDirect:etatReseau, diagnosticReseau:diagReseau, claude:etatClaude,
+    appareil:{ecran:screen.width+"×"+screen.height, fenetre:innerWidth+"×"+innerHeight, densite:window.devicePixelRatio||1,
+      langue:navigator.language||"", navigateur:navigator.userAgent||"", tactile:("ontouchstart" in window)},
+    zoneActive: zone?{id:zone.id,nom:zone.nom,lat:zone.lat,lon:zone.lon,rayon:zone.rayon,lieux:lieux.length,segmentsRue:rues.length,
+      blocsMemoire:(zone.nLieuxChunks||0)+(zone.nRuesChunks||0),meteo:!!zone.meteo,releves:(zone.historique||[]).length}:null,
+    zonesEnMemoire:zonesMem.length,
+    erreursRecentes:err.slice(-10).map(l=>l.t+" "+l.m),
+    journalRecent:journal.slice(-25).map(l=>l.t+" "+(l.k?"["+l.k+"] ":"")+l.m)
+  };
+}
+async function envoyerDiagnostic(manuel){
+  if(!db||!peutEcrire){ if(manuel) log("État technique non enregistré : mémoire indisponible ou en lecture seule.","w"); return; }
+  try{ await ecrire(db.doc("systeme/diagnostic"),etatTechnique()); if(manuel) log("État technique enregistré : Claude peut le lire depuis vos conversations.","o"); }
+  catch(e){ if(manuel) log("État technique non enregistré : "+erreurDb(e)+".","e"); }
+}
+$("btnDiag").addEventListener("click",()=>envoyerDiagnostic(true));
+
+/* ===================== Claude, agent d'analyse ===================== */
+let sample=null, outilsDispo=0, iaCtl=null, iaTours=[];
+const distCentre=l=>Math.round(Math.hypot(...proj(l.lat,l.lon)));
+function exigerZone(){ if(!zone) throw new Error("aucune zone active : il faut d'abord intégrer ou ouvrir une zone"); }
+const OUTILS=[
+ {name:"resume_zone", description:"Résumé de la zone active : nom, coordonnées, rayon, nombre de lieux et de segments de rue, statistiques par famille, services essentiels, km de voies, part des horaires connus, présence de météo, nombre de relevés.",
+  execute(){ exigerZone(); const s=zone.stats;
+    return {nom:zone.nom,lat:zone.lat,lon:zone.lon,rayon_m:zone.rayon,lieux:lieux.length,segments_rue:rues.length,
+      stats:s?{surface_km2:+s.aire.toFixed(3),par_famille:s.parFamille,services_essentiels:Object.fromEntries(s.essentiels),score_couverture:s.score,
+        km_voies:{principales:+s.km.p.toFixed(2),locales:+s.km.l.toFixed(2),pietonnes_cyclables:+s.km.f.toFixed(2)},rues_nommees:s.nbRuesNommees,
+        horaires_connus_pct:lieux.length?Math.round(100*s.avecHoraires/lieux.length):0,
+        types_frequents:Object.entries(s.parType).sort((a,b)=>b[1]-a[1]).slice(0,15).map(([t,c])=>[nomType(t),c])}:null,
+      meteo_disponible:!!zone.meteo,releves:(zone.historique||[]).length,carte_mise_a_jour:zone.majCarte||null}; }},
+ {name:"chercher_lieux", description:"Cherche des lieux de la zone active. Filtres optionnels : famille (alimentation, restauration, commerce, sante, transport, education, services, loisirs, autres), type (valeur OpenStreetMap, ex. pharmacy, bakery, bus_stop), nom (texte contenu). Renvoie au plus 'limite' lieux (40 max) avec type, horaires, ouvert maintenant, distance au centre et direction.",
+  inputSchema:{type:"object",properties:{famille:{type:"string"},type:{type:"string"},nom:{type:"string"},limite:{type:"number"}}},
+  execute(i){ exigerZone(); const f=i.famille?String(i.famille):null, t=i.type?String(i.type):null, n=i.nom?String(i.nom).toLowerCase():null;
+    const lim=Math.max(1,Math.min(40,Number(i.limite)||20)); const now=new Date(), j=(now.getDay()+6)%7;
+    const res=lieux.filter(l=>(!f||l.f===f)&&(!t||l.t===t)&&(!n||l.n.toLowerCase().includes(n)));
+    const dir=l=>{ const [x,y]=proj(l.lat,l.lon); const a=(Math.atan2(x,y)*180/Math.PI+360)%360; return ["N","NE","E","SE","S","SO","O","NO"][Math.round(a/45)%8]; };
+    return {total_correspondant:res.length,lieux:res.slice(0,lim).map(l=>({nom:l.n||"sans nom",type:nomType(l.t),famille:l.f,horaires:l.oh||"non déclarés",
+      ouvert_maintenant:ouvert(l,j,now.getHours()),horaires_presumes:!l._oh,distance_centre_m:distCentre(l),direction:dir(l)}))}; }},
+ {name:"frequentation", description:"Indice de fréquentation estimée (0-100) de la zone active. Sans argument : moyenne par jour, pics et creux de la semaine. Avec 'jour' (0=lundi … 6=dimanche) : les 24 valeurs horaires de ce jour. Inclut la fiabilité du modèle en %.",
+  inputSchema:{type:"object",properties:{jour:{type:"number"}}},
+  execute(i){ exigerZone(); if(!lieux.length) throw new Error("pas de carte intégrée : fréquentation incalculable");
+    const a=activite(), fiab=fiabActivite();
+    if(i.jour!==undefined&&i.jour!==null){ const d=Math.max(0,Math.min(6,Math.round(Number(i.jour)))); return {jour:JOURS[d],heures:a[d],fiabilite_pct:fiab}; }
+    const pics=[]; a.forEach((r,d)=>r.forEach((v,h)=>pics.push([v,JOURS[d]+" "+h+"h",h]))); pics.sort((x,y)=>y[0]-x[0]);
+    return {moyenne_par_jour:Object.fromEntries(a.map((r,d)=>[JOURS[d],Math.round(r.reduce((s,v)=>s+v,0)/24)])),
+      pics:pics.slice(0,5).map(p=>[p[1],p[0]]),creux_en_journee:pics.filter(p=>p[2]>=8&&p[2]<=20).slice(-5).map(p=>[p[1],p[0]]),fiabilite_pct:fiab,
+      methode:"profils horaires types par catégorie × horaires d'ouverture déclarés ou présumés"}; }},
+ {name:"meteo", description:"Prévisions météo de la zone active sur 7 jours (codes traduits, températures, pluie, vent) avec la fiabilité de chaque jour en % et la date de récupération.",
+  execute(){ exigerZone(); if(!zone.meteo) throw new Error("pas de météo intégrée pour cette zone");
+    const age=Math.floor((Date.now()-new Date(zone.meteo.recupereLe))/86400000);
+    return {recupere_le:zone.meteo.recupereLe,jours:zone.meteo.jours.map((j,i)=>({date:j.date,temps:WMO[j.code]??null,tmin:j.tmin,tmax:j.tmax,pluie_mm:j.pluie,proba_pluie:j.probPluie,vent_kmh:j.vent,
+      fiabilite_pct:Math.max(20,FIAB_METEO[Math.min(i+Math.max(age,0),6)]-(i+age>6?10:0)),effet_activite:facteurMeteo(j)}))}; }},
+ {name:"historique", description:"Historique des relevés de carte de la zone active (date, total de lieux, répartition par famille, km de voies), pour mesurer les tendances.",
+  execute(){ exigerZone(); return {releves:zone.historique||[]}; }},
+ {name:"zones_memoire", description:"Liste des zones enregistrées dans la mémoire en ligne avec leurs statistiques principales, pour comparer des zones entre elles.",
+  execute(){ return zonesMem.map(z=>({nom:z.nom,id:z.id,rayon_m:z.rayon,lieux:z.stats?Object.values(z.stats.parFamille).reduce((a,b)=>a+b,0):0,
+    densite_km2:z.stats?Math.round(Object.values(z.stats.parFamille).reduce((a,b)=>a+b,0)/z.stats.aire):null,par_famille:z.stats?.parFamille||null,
+    score_couverture:z.stats?.score??null,km_voies:z.stats?+z.stats.kmTotal.toFixed(2):null,releves:(z.historique||[]).length,meteo:!!z.meteo})); }},
+ {name:"etat_technique", description:"État technique de Predictor : version, mémoire, réseau, appareil, zone active, volumes de données, erreurs et journal récents.",
+  execute(){ return etatTechnique(); }}
+];
+function consignes(){
+  return `Tu es l'agent d'analyse intégré à Predictor v${VERSION}, logiciel du studio F.S.M Game House qui virtualise le monde réel (données OpenStreetMap et Open-Meteo) pour analyser et prédire.
+Règles :
+- Réponds en français, de façon structurée et concise (titres courts, listes si utile), en texte simple sans tableaux Markdown.
+- Appuie-toi uniquement sur les outils de Predictor ; appelle-les avant de conclure. N'invente aucun chiffre.
+- Tu n'as pas accès au web : si une information manque, dis quelle collecte (lien A carte, lien B météo, fichier C régional .osm.pbf) la fournirait.
+- Donne la fiabilité de chaque prédiction et distingue mesure, donnée déclarée et estimation.
+- Ne cherche ni ne déduis d'informations sur des personnes identifiables.
+Contexte : nous sommes le ${new Date().toLocaleString("fr-FR")} (heure de Paris). Zone active : ${zone?`${zone.nom} (${lieux.length} lieux, météo ${zone.meteo?"présente":"absente"})`:"aucune"}. Zones en mémoire : ${zonesMem.length}.`;
+}
+function resumeHorsOutils(){ const o={}; for(const t of OUTILS){ try{ if(t.name!=="chercher_lieux") o[t.name]=t.execute({}); }catch(e){ o[t.name]="indisponible : "+e.message; } } return JSON.stringify(o).slice(0,150000); }
+const IA_ERR={not_granted:"Claude n'est pas autorisé pour cette page.",sampling_disabled:"Claude n'est pas disponible pour ce compte.",
+  rate_limited:"Trop de demandes ou limite d'usage atteinte. Réessaie plus tard.",session_expired:"Session expirée : reconnecte-toi à Claude.",
+  prompt_too_large:"Demande trop volumineuse : pose une question plus ciblée.",refused:"Claude a refusé cette demande. Reformule-la.",
+  empty_completion:"Claude n'a rien répondu. Reformule ou simplifie la question.",upstream_error:"Connexion à Claude interrompue. Réessaie."};
+async function demander(q){
+  if(!sample||!q.trim()) return;
+  iaCtl=new AbortController(); $("iaGo").disabled=true; $("iaStop").hidden=false; $("iaEtat").textContent="Claude réfléchit…";
+  const out=$("iaOut"); out.textContent=""; const traces=[];
+  const tools=outilsDispo?OUTILS.slice(0,outilsDispo).map(t=>({...t,execute:(inp,ctx)=>{ traces.push(t.name); $("iaEtat").textContent="Claude consulte : "+traces.join(", "); return t.execute(inp||{},ctx); }})):undefined;
+  const intro=consignes()+(tools?"":"\n\nDonnées actuelles de Predictor (JSON) :\n"+resumeHorsOutils());
+  const tours=[{role:"user",content:intro},{role:"assistant",content:"Compris. Je travaille uniquement à partir des données de Predictor."},...iaTours,{role:"user",content:q}];
+  log(`Question à Claude : « ${q.slice(0,80)}${q.length>80?"…":""} »`);
+  try{
+    const r=await sample(tours,{signal:iaCtl.signal,cache:false,tools,modelTier:"default",onText:({text})=>{ out.textContent=text; $("iaEtat").textContent="Claude écrit…"; }});
+    out.textContent=r.text; iaTours.push({role:"user",content:q},{role:"assistant",content:r.text}); iaTours=iaTours.slice(-8);
+    $("iaEtat").textContent=(traces.length?"Modules consultés : "+[...new Set(traces)].join(", "):"Réponse sans consultation de module")+(r.truncated?" · réponse coupée, pose une question plus ciblée":"");
+    log("Réponse de Claude reçue"+(traces.length?" ("+[...new Set(traces)].join(", ")+")":"")+".","o");
+    if(db&&peutEcrire){ try{ await ecrire(db.collection("rapports").doc(),{date:new Date().toISOString(),zoneId:zone?.id||null,zoneNom:zone?.nom||null,question:q,reponse:r.text.slice(0,60000),modules:[...new Set(traces)],version:VERSION}); }
+      catch(e){ log("Rapport non enregistré : "+erreurDb(e)+".","e"); } }
+  }catch(e){
+    if(e&&e.code==="cancelled"){ out.textContent=e.text||""; $("iaEtat").textContent="Arrêté."; }
+    else { out.textContent=e&&e.text||""; const m=IA_ERR[e&&e.code]||"Échec de la demande à Claude ("+(e&&e.code||"inconnu")+").";
+      $("iaEtat").textContent=m; log("Claude : "+m,"e");
+      if(e&&["not_granted","sampling_disabled","capability_disabled","capability_removed","not_declared"].includes(e.code)) desactiverIA(m); }
+  }finally{ $("iaGo").disabled=!sample; $("iaStop").hidden=true; iaCtl=null; }
+}
+function desactiverIA(m){ sample=null; etatClaude="indisponible"; $("pillClaude").textContent="Claude : indisponible"; $("pillClaude").className="pill bad";
+  $("iaGo").disabled=true; document.querySelectorAll("#iaPresets button").forEach(b=>b.disabled=true); $("iaEtat").textContent=m; }
+$("iaGo").addEventListener("click",()=>demander($("iaQ").value));
+$("iaStop").addEventListener("click",()=>iaCtl?.abort());
+$("iaNew").addEventListener("click",()=>{ iaTours=[]; $("iaOut").textContent=""; $("iaEtat").textContent="Nouvelle conversation."; });
+$("iaPresets").addEventListener("click",e=>{ const b=e.target.closest("button[data-q]"); if(!b||!sample||iaCtl) return; $("iaQ").value=b.dataset.q; demander(b.dataset.q); });
+$("iaGo").disabled=true; document.querySelectorAll("#iaPresets button").forEach(b=>b.disabled=true);
+let rapports=[];
+function rendreRapports(){
+  const box=$("iaRapports");
+  if(!rapports.length){ box.innerHTML='<p class="empty">Aucun rapport pour le moment. Les réponses de Claude seront enregistrées ici et dans la mémoire en ligne.</p>'; return; }
+  box.innerHTML=rapports.map(r=>`<details class="rap zone"><summary><b>${esc(r.question.slice(0,90))}${r.question.length>90?"…":""}</b> <span class="small muted">${new Date(r.date).toLocaleString("fr-FR")}${r.zoneNom?" · "+esc(r.zoneNom):""}${r.version?" · v"+esc(r.version):""}</span></summary><div class="ia-out">${esc(r.reponse)}</div></details>`).join("");
+}
+
+/* ===================== Connexion mémoire ===================== */
+(async()=>{
+  const c=window.claude;
+  if(!c||!c.use){ $("pillDb").textContent="Mémoire : hors ligne"; $("pillDb").className="pill bad"; desactiverIA("Claude n'est joignable que lorsque Predictor est ouvert dans Claude."); rendreZones(); return; }
+  c.use("sample").then(async sp=>{
+    if(!sp){ desactiverIA("Claude n'est pas disponible sur cet affichage."); return; }
+    sample=sp; try{ const lim=await sp.limits(); outilsDispo=lim&&lim.tools?Math.min(OUTILS.length,lim.tools.maxCount||0):0; }catch(e){ outilsDispo=0; }
+    etatClaude=outilsDispo?"connecté (accès direct aux modules)":"connecté (données transmises dans la question)";
+    $("pillClaude").textContent="Claude : connecté"; $("pillClaude").className="pill ok";
+    $("iaGo").disabled=false; document.querySelectorAll("#iaPresets button").forEach(b=>b.disabled=false);
+    log("Claude connecté"+(outilsDispo?` avec accès direct à ${outilsDispo} modules.`:" (sans accès direct aux modules : les données lui sont transmises dans chaque question)."),"o");
+  });
+  const [d,u]=await Promise.all([c.use("db"),c.use("user")]);
+  if(!d){ $("pillDb").textContent="Mémoire : hors ligne"; $("pillDb").className="pill bad"; log("Mémoire en ligne indisponible sur cet affichage.","w"); rendreZones(); return; }
+  db=d;
+  if(u){ try{ const w=await u.can("data.write"); if(w===false) peutEcrire=false; }catch(e){} }
+  $("pillDb").textContent=peutEcrire?"Mémoire : connectée":"Mémoire : lecture seule"; $("pillDb").className=peutEcrire?"pill ok":"pill warn";
+  log("Mémoire en ligne connectée.","o");
+  db.collection("zones").onSnapshot(s=>{ zonesMem=s.docs.map(x=>x.data()).filter(z=>z&&z.id).sort((a,b)=>String(b.maj).localeCompare(String(a.maj))); rendreZones(); },
+    e=>{ log("Lecture de la mémoire interrompue : "+erreurDb(e)+".","e"); });
+  db.collection("rapports").orderBy("date","desc").limit(15).onSnapshot(s=>{ rapports=s.docs.map(x=>x.data()).filter(r=>r&&r.question); rendreRapports(); },
+    e=>{ log("Lecture des rapports interrompue : "+erreurDb(e)+".","e"); });
+  try{ const j=await db.doc("systeme/journal").get(); if(j.exists){ const anciens=(j.data().lignes||[]); journal=anciens.concat(journal).slice(-150); log(`${anciens.length} lignes de journal récupérées des sessions précédentes.`); } }catch(e){}
+  setTimeout(()=>envoyerDiagnostic(false),8000);
+})();
+</script>
+
+</body>
+</html>
