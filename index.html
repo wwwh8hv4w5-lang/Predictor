@@ -6,7 +6,7 @@
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
 </head>
 <body>
-<title>Predictor v1.1</title>
+<title>Predictor v1.2</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
 <style>
@@ -138,7 +138,7 @@ details.rap .ia-out{margin-top:6px}
 
 <div class="wrap">
 <header>
-  <h1>PREDICTOR <small id="verTag">v1.1 · F.S.M Game House</small></h1>
+  <h1>PREDICTOR <small id="verTag">v1.2 · F.S.M Game House</small></h1>
   <div class="pills">
     <span class="pill" id="pillDb">Mémoire : …</span>
     <span class="pill" id="pillNet">Réseau direct : non testé</span>
@@ -172,7 +172,7 @@ details.rap .ia-out{margin-top:6px}
   </div>
   <div class="row">
     <button class="primary" id="btnPrep">Préparer la collecte</button>
-    <button id="btnDirect">Tenter la collecte directe</button>
+    <button id="btnDirect">Recharger la zone (carte à jour)</button>
     <button id="btnEnrich">Enrichir la zone</button>
     <button id="btnExport">Exporter la zone</button>
   </div>
@@ -268,7 +268,7 @@ details.rap .ia-out{margin-top:6px}
 <script>
 "use strict";
 /* ===================== Constantes ===================== */
-const VERSION = "1.1"; /* version unique du projet : incrémentée à chaque évolution */
+const VERSION = "1.2"; /* version unique du projet : incrémentée à chaque évolution */
 const VILLES = [
  ["Paris",48.8566,2.3522],["Lyon",45.7640,4.8357],["Marseille",43.2965,5.3698],["Toulouse",43.6047,1.4442],
  ["Nice",43.7102,7.2620],["Nantes",47.2184,-1.5536],["Strasbourg",48.5734,7.7521],["Montpellier",43.6108,3.8767],
@@ -745,50 +745,94 @@ async function testerReseau(){
   $("pillNet").textContent="Réseau direct : "+etatReseau; $("pillNet").className="pill "+(m.ok&&o.ok?"ok":ok?"warn":"bad");
   return ok;
 }
-const SERVEURS_OVERPASS=["https://overpass-api.de/api/interpreter","https://overpass.kumi.systems/api/interpreter","https://overpass.private.coffee/api/interpreter"];
-async function telechargerCarte(z,signal,info){
-  const q=requeteOverpass(z), t0=Date.now(); let derniere="";
-  for(const url of SERVEURS_OVERPASS){
-    const hote=new URL(url).host; info&&info(`Carte OpenStreetMap · ${hote}…`);
-    const ctl=new AbortController(), t=setTimeout(()=>ctl.abort(),150000), stop=()=>ctl.abort();
-    signal&&signal.addEventListener("abort",stop,{once:true});
-    try{
-      const r=await fetch(url,{method:"POST",body:"data="+encodeURIComponent(q),headers:{"Content-Type":"application/x-www-form-urlencoded"},signal:ctl.signal});
-      if(!r.ok) throw new Error(r.status===429?"serveur saturé (429)":r.status===504?"délai dépassé côté serveur (504)":"réponse HTTP "+r.status);
-      info&&info(`Carte OpenStreetMap · réception des données (${hote})…`);
-      const txt=await r.text(); let j; try{ j=JSON.parse(txt); }catch(e){ throw new Error("réponse illisible"); }
-      const n=(j.elements||[]).length;
-      if(!n) throw new Error(j.remark?"erreur serveur : "+String(j.remark).slice(0,90):"aucune donnée renvoyée");
-      if(j.remark) log(`Carte : réponse partielle de ${hote} (${String(j.remark).slice(0,90)}).`,"w");
-      return {json:j,serveur:hote,ms:Date.now()-t0,n};
-    }catch(e){
-      if(signal&&signal.aborted) throw new Error("collecte arrêtée");
-      derniere=hote+" : "+(e.name==="AbortError"?"pas de réponse en 150 s":(e.message||e));
-      log(`Carte : échec sur ${derniere}. Essai du serveur suivant…`,"w");
-    }finally{ clearTimeout(t); signal&&signal.removeEventListener("abort",stop); }
-  }
-  throw new Error("tous les serveurs ont échoué (dernier : "+derniere+")");
+const SERVEURS_OVERPASS=["https://overpass-api.de/api/interpreter","https://overpass.kumi.systems/api/interpreter","https://overpass.private.coffee/api/interpreter","https://maps.mail.ru/osm/tools/overpass/api/interpreter"];
+/* Requêtes allégées : la carte (rues + lieux + arrêts) d'abord, les lignes de transport ensuite */
+function requeteCarteRapide(z){
+  const a=`(around:${z.rayon},${z.lat},${z.lon})`;
+  return `[out:json][timeout:60];way["highway"]["highway"!~"^(proposed|construction|abandoned|razed|corridor|elevator|bus_guideway)$"]${a};out geom qt;(node["amenity"]${a};node["shop"]${a};node["tourism"]${a};node["leisure"]${a};node["healthcare"]${a};node["office"]${a};way["amenity"]${a};way["shop"]${a};way["tourism"]${a};way["leisure"]${a};);out center tags qt;(node["public_transport"]${a};node["highway"="bus_stop"]${a};node["railway"~"^(station|halt|tram_stop|subway_entrance|stop)$"]${a};);out qt;`;
 }
-async function collecteDirecte(){
+function requeteLignes(z){
+  const a=`(around:${z.rayon},${z.lat},${z.lon})`;
+  return `[out:json][timeout:60];(node["public_transport"]${a};node["highway"="bus_stop"]${a};node["railway"~"^(station|halt|tram_stop|stop)$"]${a};)->.s;rel(bn.s)["route"~"^(bus|trolleybus|tram|subway|train|light_rail|monorail)$"];out body qt;`;
+}
+/* Interroge plusieurs serveurs en décalé et garde la première bonne réponse */
+function interrogerOverpass(q,signal,info,nom,delaiMax=90000){
+  return new Promise((resolve,reject)=>{
+    const t0=Date.now(), ctls=[], erreurs=[], minuteurs=[]; let fini=false, prochain=0, actifs=0;
+    const finir=(ok,v)=>{ if(fini) return; fini=true; minuteurs.forEach(clearTimeout); ctls.forEach(c=>c.abort()); signal&&signal.removeEventListener("abort",stop); ok?resolve(v):reject(v); };
+    const stop=()=>finir(false,new Error("collecte arrêtée"));
+    if(signal){ if(signal.aborted) return stop(); signal.addEventListener("abort",stop,{once:true}); }
+    const lancer=()=>{
+      if(fini||prochain>=SERVEURS_OVERPASS.length) return;
+      const url=SERVEURS_OVERPASS[prochain++], hote=new URL(url).host, ctl=new AbortController(); ctls.push(ctl); actifs++;
+      info&&info(`${nom} · ${actifs>1?actifs+" serveurs interrogés en parallèle":hote}…`);
+      const t=setTimeout(()=>ctl.abort(),delaiMax); minuteurs.push(t);
+      fetch(url,{method:"POST",body:"data="+encodeURIComponent(q),headers:{"Content-Type":"application/x-www-form-urlencoded"},signal:ctl.signal})
+        .then(async r=>{ if(!r.ok) throw new Error(r.status===429?"saturé (429)":r.status===504?"délai dépassé (504)":"HTTP "+r.status);
+          info&&info(`${nom} · réception des données (${hote})…`);
+          const j=JSON.parse(await r.text());
+          if(j.remark&&/error|timed out|out of memory/i.test(j.remark)&&!(j.elements||[]).length) throw new Error("erreur serveur");
+          return j; })
+        .then(j=>{ if(j.remark) log(`${nom} : réponse partielle de ${hote}.`,"w"); finir(true,{json:j,serveur:hote,ms:Date.now()-t0}); })
+        .catch(e=>{ if(fini) return; const m=e.name==="AbortError"?`pas de réponse en ${delaiMax/1000} s`:(e.message||String(e)); erreurs.push(hote+" : "+m);
+          log(`${nom} : ${hote} indisponible (${m}).`,"w"); lancer(); })
+        .finally(()=>{ clearTimeout(t); actifs--; if(!fini&&actifs<=0&&prochain>=SERVEURS_OVERPASS.length) finir(false,new Error("tous les serveurs ont échoué ("+erreurs.join(" ; ")+")")); });
+    };
+    lancer(); minuteurs.push(setTimeout(lancer,7000),setTimeout(lancer,15000),setTimeout(lancer,25000));
+  });
+}
+async function telechargerCarte(z,signal,info){
+  const c=await interrogerOverpass(requeteCarteRapide(z),signal,info,"Carte OpenStreetMap");
+  return {...c,n:(c.json.elements||[]).length};
+}
+/* Cache local des cartes (IndexedDB) : une zone déjà chargée revient instantanément */
+const CACHE_JOURS=3;
+function idb(){ return new Promise((res,rej)=>{ try{ const r=indexedDB.open("predictor-cache",1); r.onupgradeneeded=()=>r.result.createObjectStore("cartes"); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }catch(e){ rej(e); } }); }
+async function cacheLire(cle){ try{ const d=await idb(); return await new Promise(res=>{ const q=d.transaction("cartes").objectStore("cartes").get(cle); q.onsuccess=()=>res(q.result||null); q.onerror=()=>res(null); }); }catch(e){ return null; } }
+async function cacheEcrire(cle,val){ try{ const d=await idb(); await new Promise(res=>{ const tx=d.transaction("cartes","readwrite"); tx.objectStore("cartes").put(val,cle); tx.oncomplete=res; tx.onerror=res; }); }catch(e){} }
+function ajouterLignes(jsonCarte,jsonLignes){
+  const arrets=new Map();
+  for(const el of jsonCarte.elements||[]){ const tg=el.tags||{}; if(el.type==="node"&&estArret(tg)&&isFinite(el.lat)) arrets.set(String(el.id),{id:String(el.id),nom:tg.name||"",lat:el.lat,lon:el.lon}); }
+  return construireTransport(arrets,(jsonLignes.elements||[]).filter(e=>e.type==="relation"));
+}
+async function collecteDirecte(opts={}){
   const z=zoneDepuisForm(); if(!z) return;
   if(z.rayon>1500) log(`Grande zone (${z.rayon/1000} km) : la collecte peut prendre plusieurs minutes.`,"w");
-  const sig=chargeurDebut("Collecte directe · "+z.nom); $("btnDirect").disabled=true;
-  log(`Collecte directe de « ${z.nom} » (${z.lat.toFixed(4)}, ${z.lon.toFixed(4)}, rayon ${z.rayon} m)…`);
+  const sig=chargeurDebut("Collecte · "+z.nom); $("btnDirect").disabled=true;
+  log(`Collecte de « ${z.nom} » (${z.lat.toFixed(4)}, ${z.lon.toFixed(4)}, rayon ${z.rayon} m)…`);
   try{
     etapeUI("reseau","Test du réseau…","cours");
     await testerReseau();
     if(!diagReseau.meteo.ok&&!diagReseau.carte.ok){ etapeUI("reseau","Réseau : aucun service joignable depuis cette page. Utilise les liens A, B ou C.","err"); preparer(); return; }
-    etapeUI("reseau",`Réseau : Open-Meteo ${diagReseau.meteo.ok?"OK":"indisponible"} · OpenStreetMap ${diagReseau.carte.ok?"OK":"indisponible (serveurs de secours essayés)"}`,"ok");
-    etapeUI("carte",`Carte OpenStreetMap (rayon ${z.rayon} m)…`,"cours");
-    try{
-      const c=await telechargerCarte(z,sig,m=>etapeUI("carte",m,"cours"));
-      await traiterJson(c.json,"Overpass ("+c.serveur+")");
-      if(!zone||zone.id!==z.id||!lieux.length&&!rues.length) throw new Error("données reçues mais non intégrées (voir journal)");
-      etapeUI("carte",`Carte : ${fmt(lieux.length)} lieux, ${fmt(rues.length)} segments${zone.transport?", "+zone.transport.lignes.length+" lignes de transport":""} (${c.serveur}, ${Math.round(c.ms/1000)} s)`,"ok");
-    }catch(e){ etapeUI("carte","Carte : échec ("+(e.message||e)+")","err"); log("Carte : échec ("+(e.message||e)+").","e"); if(sig.aborted) return; }
+    etapeUI("reseau",`Réseau : Open-Meteo ${diagReseau.meteo.ok?"OK":"indisponible"} · OpenStreetMap ${diagReseau.carte.ok?"OK":"lent ou indisponible (serveurs de secours prévus)"}`,"ok");
+    /* météo en parallèle de la carte */
     etapeUI("meteo","Prévisions météo 7 jours…","cours");
-    try{ const j=await getJSON(urlMeteo(z),30000,sig); await traiterJson(j); if(!zone||!zone.meteo) throw new Error("données non intégrées"); etapeUI("meteo","Météo : 7 jours de prévisions","ok"); }
-    catch(e){ etapeUI("meteo","Météo : échec ("+(e.message||e)+")","err"); log("Météo : échec ("+(e.message||e)+").","e"); if(sig.aborted) return; }
+    const pMeteo=getJSON(urlMeteo(z),30000,sig).then(j=>({ok:true,j}),e=>({ok:false,e}));
+    etapeUI("carte",`Carte OpenStreetMap (rayon ${z.rayon} m)…`,"cours");
+    let carteJson=null;
+    try{
+      const cache=opts.forcer?null:await cacheLire(z.id);
+      let c;
+      if(cache&&cache.carte&&Date.now()-cache.date<CACHE_JOURS*86400000){ c={json:cache.carte,serveur:"cache de l'appareil",ms:0}; log(`Carte reprise du cache de l'appareil (téléchargée le ${new Date(cache.date).toLocaleString("fr-FR")}).`,"o"); }
+      else c=await telechargerCarte(z,sig,m=>etapeUI("carte",m,"cours"));
+      carteJson=c.json;
+      await traiterJson(c.json,"Overpass ("+c.serveur+")");
+      if(!zone||zone.id!==z.id||!lieux.length&&!rues.length) throw new Error("aucune rue ni aucun lieu dans cette zone (voir journal)");
+      if(c.serveur!=="cache de l'appareil") cacheEcrire(z.id,{carte:c.json,lignes:cache&&cache.lignes||null,date:Date.now()});
+      else if(cache.lignes&&!(zone.transport&&zone.transport.lignes.length)){ zone.transport=ajouterLignes(cache.carte,cache.lignes); }
+      etapeUI("carte",`Carte : ${fmt(lieux.length)} lieux, ${fmt(rues.length)} segments de rue (${c.serveur}${c.ms?", "+Math.round(c.ms/1000)+" s":""})`,"ok");
+    }catch(e){ etapeUI("carte","Carte : échec ("+(e.message||e)+")","err"); log("Carte : échec ("+(e.message||e)+").","e"); if(sig.aborted) return; }
+    const m=await pMeteo;
+    if(m.ok){ try{ await traiterJson(m.j); if(!zone||!zone.meteo) throw new Error("données non intégrées"); etapeUI("meteo","Météo : 7 jours de prévisions","ok"); }catch(e){ etapeUI("meteo","Météo : échec ("+(e.message||e)+")","err"); } }
+    else { etapeUI("meteo","Météo : échec ("+(m.e.message||m.e)+")","err"); log("Météo : échec ("+(m.e.message||m.e)+").","e"); if(sig.aborted) return; }
+    /* lignes de transport : requête séparée, non bloquante en cas d'échec */
+    if(carteJson&&zone&&zone.id===z.id&&!(zone.transport&&zone.transport.lignes.length)){
+      etapeUI("lignes","Lignes de transport…","cours");
+      try{ const l=await interrogerOverpass(requeteLignes(z),sig,m=>etapeUI("lignes",m,"cours"),"Lignes de transport",60000);
+        zone.transport=ajouterLignes(carteJson,l.json); const prev=await cacheLire(z.id); cacheEcrire(z.id,{...(prev||{carte:carteJson,date:Date.now()}),lignes:l.json});
+        etapeUI("lignes",`Lignes de transport : ${zone.transport.lignes.length} ligne(s) (${l.serveur}, ${Math.round(l.ms/1000)} s)`,"ok"); toutAfficher(false); await sauverZone(true); }
+      catch(e){ etapeUI("lignes","Lignes de transport : non chargées ("+(e.message||e)+"), le reste fonctionne","info"); if(sig.aborted) return; }
+    } else if(zone&&zone.transport) etapeUI("lignes",`Lignes de transport : ${zone.transport.lignes.length} ligne(s)`,"ok");
     if(zone&&zone.id===z.id) await enrichir();
   }finally{ $("btnDirect").disabled=false; chargeurFin(); }
 }
@@ -1449,7 +1493,7 @@ async function geocoderEvenement(ex,signal){
   }
   return {precision:"inconnue"};
 }
-function depoInfo(){ const h=location.host.match(/^([\w\-]+)\.github\.io$/i), seg=location.pathname.split("/").filter(Boolean)[0];
+function depoInfo(){ const h=location.host.match(/^([\w\-]+)\.github\.io$/i), seg=String(location.pathname||"").split("/").filter(Boolean)[0];
   return h&&seg?{owner:h[1],repo:seg}:{owner:"wwwh8hv4w5-lang",repo:"Predictor"}; }
 async function chargerFluxActu17(signal,info){
   const essais=[["actu17.fr (direct)",["https://actu17.fr/feed/"]]];
@@ -1928,7 +1972,7 @@ function copier(id){ const url=$(id).href;
 $("cpCarte").addEventListener("click",()=>copier("lnkCarte"));
 $("cpMeteo").addEventListener("click",()=>copier("lnkMeteo"));
 $("btnPrep").addEventListener("click",preparer);
-$("btnDirect").addEventListener("click",collecteDirecte);
+$("btnDirect").addEventListener("click",()=>collecteDirecte({forcer:true}));
 $("btnEnrich").addEventListener("click",()=>enrichir());
 $("btnExport").addEventListener("click",exporterZone);
 $("btnIntegrer").addEventListener("click",async()=>{ const t=$("taImport").value.trim(); if(!t){ log("Rien à intégrer : colle d'abord le résultat d'un lien.","w"); return; }
