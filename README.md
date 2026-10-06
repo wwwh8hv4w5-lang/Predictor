@@ -2,7 +2,11 @@
 
 Logiciel d'analyse de données et de prédiction sur un monde réel virtualisé, développé par **F.S.M Game House**.
 
-Version actuelle : **v1.5**
+Version actuelle : **v2.0**
+
+## Utilisation
+
+Un écran, une barre de recherche. Tape une adresse, un quartier ou une ville : Predictor localise le lieu, rassemble tout seul les données (carte, météo, population, accidents, délinquance, actualité, comptages) et rédige un rapport clair de la situation de la zone, avec une carte des lieux à surveiller et la fiabilité de chaque partie.
 
 ## Ce que fait Predictor
 
@@ -15,7 +19,7 @@ Version actuelle : **v1.5**
 7. **Prédictions** : météo 7 jours avec fiabilité mesurée, fréquentation par heure et par jour, modèle calé sur mesures réelles et testé sur des jours qu'il n'a jamais vus, effet mesuré de la pluie, suivi de la précision des prévisions dans le temps.
 8. **Mémoire en ligne** et **agent Claude** : disponibles quand Predictor est ouvert dans Claude. La version web exporte des paquets de zone que la version Claude importe.
 
-## Utilisation
+## Moteur (détail)
 
 Ouvrir la page web, taper une adresse précise ou un lieu, puis « Charger la zone » : Predictor localise l'adresse et télécharge automatiquement la carte, la météo et les données réelles. Les prédictions s'affichent d'abord en bref, en phrases simples avec leur fiabilité, puis en détail. Hors de Claude, la mémoire en ligne et l'agent Claude sont désactivés ; le suivi de précision est conservé sur l'appareil.
 
