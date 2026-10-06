@@ -3,10 +3,18 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Predictor">
+<meta name="application-name" content="Predictor">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0d141d">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" href="apple-touch-icon.png">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
 </head>
 <body>
-<title>Predictor v3.0</title>
+<title>Predictor v3.1</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
 <style>
@@ -128,6 +136,9 @@ table.wrapt td.num{white-space:nowrap}
 .bes-b{margin-top:2px}
 a.btn{display:inline-block;padding:6px 10px;border:1px solid var(--accent);border-radius:3px;background:var(--accent);color:var(--accent-fg);text-decoration:none;font-size:14px}
 #etapesVisibles:empty{display:none}
+.install{border:1px solid var(--accent);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;background:var(--bg)}
+.install-ico{border-radius:10px}
+.install ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px}
 
 .maj{position:sticky;top:env(safe-area-inset-top,0px);z-index:25;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;background:var(--accent);color:var(--accent-fg);padding:10px 16px}
 .maj button{background:var(--accent-fg);color:var(--accent);border-color:var(--accent-fg)}
@@ -168,7 +179,7 @@ details.rap .ia-out{margin-top:6px}
 
 <div class="wrap">
 <header>
-  <h1>PREDICTOR <small id="verTag">v3.0 · F.S.M Game House</small></h1>
+  <h1>PREDICTOR <small id="verTag">v3.1 · F.S.M Game House</small></h1>
   <div class="pills">
     <span class="pill" id="pillDb">Mémoire : …</span>
     <span class="pill" id="pillNet">Réseau direct : non testé</span>
@@ -184,6 +195,14 @@ details.rap .ia-out{margin-top:6px}
 </div>
 
 <section id="secZone" aria-labelledby="hZone">
+  <div id="installBox" class="install" hidden>
+    <div class="row" style="align-items:center"><img src="apple-touch-icon.png" alt="" width="44" height="44" class="install-ico" onerror="this.style.display='none'"><div style="flex:1;min-width:0"><b>Installer Predictor</b><br><span class="small muted">Une icône sur l'écran d'accueil, ouverture en plein écran comme une application.</span></div><button id="btnInstall" class="primary">Installer</button><button id="btnInstallNon" aria-label="Masquer">✕</button></div>
+    <ol id="installEtapes" class="small" hidden>
+      <li>Touche le bouton <b>Partager</b> de Safari (le carré avec une flèche vers le haut), en bas de l'écran.</li>
+      <li>Fais défiler et choisis <b>« Sur l'écran d'accueil »</b>.</li>
+      <li>Touche <b>Ajouter</b> en haut à droite : l'icône Predictor apparaît sur ton écran d'accueil.</li>
+    </ol>
+  </div>
   <h2 id="hZone">1 · Rechercher</h2>
   <form id="formRech" class="rech" role="search" autocomplete="off">
     <input id="inRecherche" type="search" enterkeyhint="search" autocomplete="off" placeholder="Une adresse, un lieu, une gare, une ville…" aria-label="Adresse ou lieu">
@@ -211,7 +230,6 @@ details.rap .ia-out{margin-top:6px}
   </div>
   <p class="small muted" style="margin:0">« Enrichir la zone » ajoute la démographie INSEE, la météo des 92 derniers jours, la précision météo mesurée et les comptages réels (Paris), puis cale le moteur. Il faut un accès réseau direct (version web GitHub). « Exporter la zone » crée un fichier à importer dans Predictor ouvert dans Claude pour l'enregistrer en mémoire.</p>
   <div id="etapesBox" aria-live="polite" hidden></div>
-  </details>
   <div class="links" id="linksBox" hidden>
     <div class="linkline"><span class="mono">A · Carte (OpenStreetMap)</span> <a id="lnkCarte" href="#" target="_blank" rel="noopener">obtenir le fichier</a> <button id="cpCarte">Copier le lien</button></div>
     <p class="small muted" style="margin:0">Le lien ouvre Overpass Turbo, qui lance la collecte de la zone tout seul (jusqu'à une minute ; accepte l'avertissement « beaucoup de données » s'il apparaît). Touche ensuite <b>Exporter</b>, puis le bouton <b>télécharger</b> de la ligne « données brutes » ou « GeoJSON ».</p>
@@ -231,6 +249,7 @@ details.rap .ia-out{margin-top:6px}
     <div class="bar" style="height:10px"><i id="pbfBar" style="width:0%"></i></div>
     <div class="row"><span class="small mono" id="pbfTxt">Lecture…</span><button id="pbfStop">Arrêter la lecture</button></div>
   </div>
+  </details>
 </section>
 
 <section id="secBesoins" aria-labelledby="hBes">
@@ -308,7 +327,7 @@ details.rap .ia-out{margin-top:6px}
 <script>
 "use strict";
 /* ===================== Constantes ===================== */
-const VERSION = "3.0"; /* version unique du projet : incrémentée à chaque évolution */
+const VERSION = "3.1"; /* version unique du projet : incrémentée à chaque évolution */
 const VILLES = [
  ["Paris",48.8566,2.3522],["Lyon",45.7640,4.8357],["Marseille",43.2965,5.3698],["Toulouse",43.6047,1.4442],
  ["Nice",43.7102,7.2620],["Nantes",47.2184,-1.5536],["Strasbourg",48.5734,7.7521],["Montpellier",43.6108,3.8767],
@@ -2339,6 +2358,20 @@ new MutationObserver(redessiner).observe(document.documentElement,{attributes:tr
 document.querySelectorAll("#segFond button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.fond===fond))); majFondInfo();
 $("verTag").textContent=`v${VERSION} · F.S.M Game House`; document.title=`Predictor v${VERSION}`;
 log(`Predictor v${VERSION} démarré.`);
+/* Installation sur l'écran d'accueil */
+(function(){
+  const ua=navigator.userAgent||"", ios=/iPhone|iPad|iPod/.test(ua)||(/Macintosh/.test(ua)&&"ontouchend" in document);
+  const installe=navigator.standalone===true||window.matchMedia?.("(display-mode: standalone)").matches;
+  let masque=false; try{ masque=localStorage.getItem("predictor-install-masque")==="1"; }catch(e){}
+  let invite=null;
+  const montrer=()=>{ if(!installe&&!masque&&!window.claude&&/^https:$/.test(location.protocol)) $("installBox").hidden=false; };
+  if(ios) montrer();
+  window.addEventListener("beforeinstallprompt",e=>{ e.preventDefault(); invite=e; montrer(); });
+  $("btnInstall").addEventListener("click",async()=>{ if(invite){ invite.prompt(); try{ await invite.userChoice; }catch(e){} invite=null; $("installBox").hidden=true; return; }
+    $("installEtapes").hidden=!$("installEtapes").hidden; $("btnInstall").textContent=$("installEtapes").hidden?"Installer":"Compris"; if($("installEtapes").hidden) $("installBox").hidden=true; });
+  $("btnInstallNon").addEventListener("click",()=>{ $("installBox").hidden=true; try{ localStorage.setItem("predictor-install-masque","1"); }catch(e){} });
+  if(installe) log("Predictor est ouvert depuis l'écran d'accueil.");
+})();
 /* Vérification de mise à jour : compare avec la version publiée (hors Claude) */
 const cmpVer=(a,b)=>{ const x=String(a).split(".").map(Number), y=String(b).split(".").map(Number); for(let i=0;i<Math.max(x.length,y.length);i++){ const d=(x[i]||0)-(y[i]||0); if(d) return d; } return 0; };
 async function verifierMiseAJour(){
