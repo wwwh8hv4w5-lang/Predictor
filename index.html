@@ -6,7 +6,7 @@
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
 </head>
 <body>
-<title>Predictor v1.2</title>
+<title>Predictor v1.3</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
 <style>
@@ -138,7 +138,7 @@ details.rap .ia-out{margin-top:6px}
 
 <div class="wrap">
 <header>
-  <h1>PREDICTOR <small id="verTag">v1.2 · F.S.M Game House</small></h1>
+  <h1>PREDICTOR <small id="verTag">v1.3 · F.S.M Game House</small></h1>
   <div class="pills">
     <span class="pill" id="pillDb">Mémoire : …</span>
     <span class="pill" id="pillNet">Réseau direct : non testé</span>
@@ -229,8 +229,9 @@ details.rap .ia-out{margin-top:6px}
 </section>
 
 <section aria-labelledby="hEvt">
-  <h2 id="hEvt">5 · Événements en cours (Actu17)</h2>
-  <div class="row"><button class="primary" id="btnActu">Charger l'actualité</button><span class="small muted">Lit le flux d'Actu17, classe chaque article (agression, vol, accident…), trouve son lieu et le place sur la carte.</span></div>
+  <h2 id="hEvt">5 · Événements en cours (presse)</h2>
+  <div class="row"><button class="primary" id="btnActu">Charger l'actualité</button><span class="small muted">Lit Actu17, les flux RSS de ta liste et les titres de toute la presse française via GDELT, classe chaque article (agression, vol, accident…), regroupe les articles qui parlent du même fait, trouve son lieu et le place sur la carte.</span></div>
+  <div id="sourcesEtat"></div>
   <div id="evt"><p class="empty">Aucun événement chargé.</p></div>
 </section>
 
@@ -268,7 +269,7 @@ details.rap .ia-out{margin-top:6px}
 <script>
 "use strict";
 /* ===================== Constantes ===================== */
-const VERSION = "1.2"; /* version unique du projet : incrémentée à chaque évolution */
+const VERSION = "1.3"; /* version unique du projet : incrémentée à chaque évolution */
 const VILLES = [
  ["Paris",48.8566,2.3522],["Lyon",45.7640,4.8357],["Marseille",43.2965,5.3698],["Toulouse",43.6047,1.4442],
  ["Nice",43.7102,7.2620],["Nantes",47.2184,-1.5536],["Strasbourg",48.5734,7.7521],["Montpellier",43.6108,3.8767],
@@ -697,8 +698,8 @@ $("pbfStop").addEventListener("click",()=>pbfCtl?.abort());
 async function traiterJson(json,source){
   if(json&&json.predictorPaquet){ try{ await importerPaquet(json); }catch(e){ log("Paquet non importé : "+(e.message||e)+".","e"); } return; }
   if(json&&Array.isArray(json.rss)){ const sig=chargeurDebut("Analyse du flux importé");
-    try{ etapeUI("actuloc","Analyse et localisation des articles…","cours"); const n=await analyserFlux(json.rss,sig,m=>etapeUI("actuloc",m,"cours"));
-      etapeUI("actuloc",`${n} article(s) analysé(s)`,"ok"); log(`Flux importé : ${json.rss.length} articles, ${n} nouveaux analysés.`,"o"); await sauverEvenements(); rendreEvenements(); toutAfficher(false); }
+    try{ etapeUI("actuloc","Analyse et localisation des articles…","cours"); const n=(await analyserFlux(json.rss,sig,m=>etapeUI("actuloc",m,"cours"))).nouveaux;
+      etapeUI("actuloc",`${n} fait(s) nouveau(x)`,"ok"); log(`Flux importé : ${json.rss.length} articles, ${n} nouveaux faits.`,"o"); await sauverEvenements(); rendreEvenements(); toutAfficher(false); }
     catch(e){ etapeUI("actuloc","Analyse : échec ("+(e.message||e)+")","err"); } finally{ chargeurFin(); } return; }
   const z=zoneCible(); if(!z) return;
   if(Array.isArray(json.elements)){
@@ -1311,9 +1312,7 @@ async function enrichir(){
     E.delinquance=await chargerDelinquance(E.demographie.code,sig); const top=E.delinquance.indicateurs[0];
     return `commune ${E.delinquance.code}, ${E.delinquance.annee}, ${E.delinquance.indicateurs.length} indicateurs${top?" (plus élevé : "+top.indicateur.toLowerCase()+")":""}`; });
   else etapeUI("delinq","Délinquance enregistrée : commune inconnue (France uniquement)","info");
-  await etape("actu17","Événements Actu17",async()=>{
-    const f=await chargerFluxActu17(sig,m=>etapeUI("actu17",m,"cours")); const nv=await analyserFlux(f.items,sig,m=>etapeUI("actu17",m,"cours")); await sauverEvenements(); rendreEvenements();
-    return `${f.items.length} articles lus (${f.source}), ${nv} nouveaux analysés, ${evenementsZone(z).length} dans la zone`; });
+  await etape("actu17","Actualité (Actu17, flux RSS, presse via GDELT)",async()=>collecterPresse(sig,m=>etapeUI("actu17",m,"cours"),z));
   /* calage du moteur */
   etapeUI("cal","Calage du moteur…","cours");
   const act=lieux.length?activite():null; E.calibration={};
@@ -1440,15 +1439,20 @@ function classerEvenement(txt){
 }
 const decEnt=s=>String(s||"").replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g,"$1").replace(/<[^>]+>/g," ").replace(/&#(\d+);/g,(m,d)=>String.fromCharCode(+d)).replace(/&#x([0-9a-f]+);/gi,(m,h)=>String.fromCharCode(parseInt(h,16)))
   .replace(/&nbsp;/g," ").replace(/&amp;/g,"&").replace(/&lt;/g,"<").replace(/&gt;/g,">").replace(/&quot;/g,'"').replace(/&apos;|&rsquo;|&#8217;/g,"’").replace(/\s+/g," ").trim();
-function lireRSS(xml){
-  const items=[]; const re=/<item\b[\s\S]*?<\/item>/gi; let m;
+function lireRSS(xml,source){
+  const items=[];
   const champ=(b,t)=>{ const r=b.match(new RegExp(`<${t}\\b[^>]*>([\\s\\S]*?)<\\/${t}>`,"i")); return r?decEnt(r[1]):""; };
-  while((m=re.exec(xml))){ const b=m[0];
+  const dom=u=>{ try{ return new URL(u).host.replace(/^www\./,""); }catch(e){ return source||"?"; } };
+  for(const m of xml.matchAll(/<item\b[\s\S]*?<\/item>/gi)){ const b=m[0];
     const cats=[...b.matchAll(/<category\b[^>]*>([\s\S]*?)<\/category>/gi)].map(x=>decEnt(x[1]));
     const lien=champ(b,"link")||champ(b,"guid");
-    items.push({titre:champ(b,"title"),lien,date:new Date(champ(b,"pubDate")||Date.now()).toISOString(),categories:cats,resume:champ(b,"description").replace(/L’article .*? est apparu en premier sur .*$/,"").slice(0,400)}); }
-  if(!items.length) throw new Error("aucun article trouvé dans le flux");
-  return items;
+    items.push({titre:champ(b,"title"),lien,date:new Date(champ(b,"pubDate")||champ(b,"dc:date")||Date.now()).toISOString(),categories:cats,resume:champ(b,"description").replace(/L’article .*? est apparu en premier sur .*$/,"").slice(0,400),source:source||dom(lien)}); }
+  if(!items.length) for(const m of xml.matchAll(/<entry\b[\s\S]*?<\/entry>/gi)){ const b=m[0];
+    const l=b.match(/<link\b[^>]*href="([^"]+)"/i), lien=l?l[1]:champ(b,"id");
+    items.push({titre:champ(b,"title"),lien,date:new Date(champ(b,"published")||champ(b,"updated")||Date.now()).toISOString(),categories:[...b.matchAll(/<category\b[^>]*term="([^"]+)"/gi)].map(x=>x[1]),resume:(champ(b,"summary")||champ(b,"content")).slice(0,400),source:source||dom(lien)}); }
+  const ok=items.filter(x=>x.titre&&x.lien&&!isNaN(new Date(x.date)));
+  if(!ok.length) throw new Error("aucun article trouvé dans le flux");
+  return ok;
 }
 const VOIE=/\b(rue|avenue|av\.|boulevard|bd|place|quai|cours|all[ée]e|impasse|chemin|route|square|passage|esplanade|cit[ée]|parvis|pont|porte|gare)\s+(?:de la |de l'|de l’|des |du |de |d'|d’)?([A-ZÉÈÀÂÎÔÛ][\w'’\-éèêëàâîïôöûüç]*(?:[ \-](?:de|du|des|la|le|les|d'|l'|[A-ZÉÈÀÂÎÔÛ0-9][\w'’\-éèêëàâîïôöûüç]*)){0,4})/;
 const COMMUNE_PAR=/([A-ZÉÈÀÂÎÔÛ][\w'’éèêëàâîïôöûüç]+(?:[ \-](?:sur|sous|en|le|la|les|lès|lez|de|du|des|aux|au|d'|d’|l'|l’|Saint|Sainte|St|[A-ZÉÈÀÂÎÔÛ][\w'’éèêëàâîïôöûüç]+)){0,5})\s*\(([^)]{2,40})\)/g;
@@ -1463,7 +1467,7 @@ function extraireLieux(titre,resume){
   for(const m of txt.matchAll(/\b(?:à|À|a)\s+([A-ZÉÈÀÂÎÔÛ][\w'’éèêëàâîïôöûüç]+(?:[ \-](?:sur|sous|en|le|la|les|lès|de|du|des|d'|d’|l'|Saint|Sainte|[A-ZÉÈÀÂÎÔÛ][\w'’éèêëàâîïôöûüç]+)){0,4})/g)){
     const nom=m[1].trim(); if(MOTS_NON_LIEUX.has(nom.split(/[ \-]/)[0])) continue; cands.push({commune:nom,dep:null,poids:1}); }
   const arr=txt.match(/\b(\d{1,2})(?:e|er|ème)\s+arrondissement(?:\s+de\s+(Paris|Lyon|Marseille))?/i);
-  if(arr){ const v=(arr[2]||"Paris").toLowerCase(), n=+arr[1]; const base=v==="lyon"?69380:v==="marseille"?13200:75100; if(n>=1&&n<=20) cands.push({codeInsee:String(base+n),poids:3}); }
+  if(arr){ const v=(arr[2]||(/\bmarseille\b/i.test(txt)?"marseille":/\blyon\b/i.test(txt)?"lyon":"paris")).toLowerCase(), n=+arr[1]; const base=v==="lyon"?69380:v==="marseille"?13200:75100, max=v==="lyon"?9:v==="marseille"?16:20; if(n>=1&&n<=max) cands.push({codeInsee:String(base+n),poids:3}); }
   const voie=txt.match(VOIE);
   const vus=new Set(), uniq=[];
   for(const c of cands.sort((a,b)=>b.poids-a.poids)){ const k=(c.commune||c.codeInsee||c.departement)+"|"+(c.dep||""); if(!vus.has(k)){ vus.add(k); uniq.push(c); } }
@@ -1495,21 +1499,51 @@ async function geocoderEvenement(ex,signal){
 }
 function depoInfo(){ const h=location.host.match(/^([\w\-]+)\.github\.io$/i), seg=String(location.pathname||"").split("/").filter(Boolean)[0];
   return h&&seg?{owner:h[1],repo:seg}:{owner:"wwwh8hv4w5-lang",repo:"Predictor"}; }
-async function chargerFluxActu17(signal,info){
-  const essais=[["actu17.fr (direct)",["https://actu17.fr/feed/"]]];
-  const d=depoInfo(); essais.push([`copie GitHub (${d.owner}/${d.repo})`,[1,2,3].map(p=>`https://raw.githubusercontent.com/${d.owner}/${d.repo}/main/data/actu17-${p}.xml`)]);
+/* ----- Sources de presse ----- */
+const SOURCES_DEFAUT=[{id:"actu17",nom:"Actu17",url:"https://actu17.fr/feed/"}];
+let sourcesPresse=SOURCES_DEFAUT.slice(), etatSources={};
+const urlCopie=chemin=>{ const d=depoInfo(); return `https://raw.githubusercontent.com/${d.owner}/${d.repo}/main/${chemin}`; };
+async function fetchTexte(u,signal,delai=20000){
+  const ctl=new AbortController(), t=setTimeout(()=>ctl.abort(),delai), stop=()=>ctl.abort(); signal&&signal.addEventListener("abort",stop,{once:true});
+  try{ const r=await fetch(u,{signal:ctl.signal,cache:"no-store"}); if(!r.ok) throw new Error("HTTP "+r.status); return await r.text(); }
+  catch(e){ if(signal&&signal.aborted) throw new Error("collecte arrêtée"); if(e.name==="AbortError") throw new Error("pas de réponse"); throw e; }
+  finally{ clearTimeout(t); signal&&signal.removeEventListener("abort",stop); }
+}
+function lireListeSources(txt){
+  const L=[]; for(const ligne of String(txt).split(/\r?\n/)){ const t=ligne.trim(); if(!t||t.startsWith("#")) continue;
+    const [id,nom,url]=t.split("|").map(x=>(x||"").trim()); if(/^[\w\-]{2,40}$/.test(id)&&/^https?:\/\//.test(url||"")) L.push({id,nom:nom||id,url}); }
+  return L;
+}
+async function chargerListeSources(signal){
+  try{ const L=lireListeSources(await fetchTexte(urlCopie("data/sources.txt"),signal,12000)); const m=new Map(SOURCES_DEFAUT.map(x=>[x.id,x])); L.forEach(x=>m.set(x.id,x)); sourcesPresse=[...m.values()]; }
+  catch(e){ if(signal&&signal.aborted) throw e; sourcesPresse=SOURCES_DEFAUT.slice(); }
+  return sourcesPresse;
+}
+async function chargerFlux(src,signal){
+  const essais=[["direct",[src.url]],["copie GitHub",[urlCopie(`data/flux-${src.id}.xml`)].concat(src.id==="actu17"?[1,2,3].map(p=>urlCopie(`data/actu17-${p}.xml`)):[])]];
   let derniere="";
-  for(const [nom,urls] of essais){
-    try{ info&&info("Actu17 · "+nom+"…"); const textes=[];
-      for(const u of urls){ const ctl=new AbortController(), t=setTimeout(()=>ctl.abort(),20000), stop=()=>ctl.abort(); signal&&signal.addEventListener("abort",stop,{once:true});
-        try{ const r=await fetch(u,{signal:ctl.signal,cache:"no-store"}); if(r.ok) textes.push(await r.text()); else if(!textes.length) throw new Error("HTTP "+r.status); }
-        finally{ clearTimeout(t); signal&&signal.removeEventListener("abort",stop); } }
-      const items=[]; for(const x of textes){ try{ items.push(...lireRSS(x)); }catch(e){} }
-      if(!items.length) throw new Error("flux vide ou illisible");
-      return {items,source:nom};
-    }catch(e){ if(signal&&signal.aborted) throw new Error("collecte arrêtée"); derniere=nom+" : "+(e.name==="AbortError"?"pas de réponse":(e.message||e)); }
-  }
-  throw new Error("flux inaccessible ("+derniere+"). Ajoute le robot GitHub (fichier actu17.yml) ou importe le flux à la main.");
+  for(const [mode,urls] of essais){ const items=[];
+    for(const u of urls){ try{ items.push(...lireRSS(await fetchTexte(u,signal),src.nom)); }catch(e){ if(signal&&signal.aborted) throw e; derniere=mode+" : "+(e.message||e); } }
+    if(items.length){ const vus=new Set(); return {items:items.filter(x=>!vus.has(x.lien)&&vus.add(x.lien)),mode}; } }
+  throw new Error(derniere||"flux illisible");
+}
+/* ----- GDELT : titres de toute la presse française (base ouverte) ----- */
+const MOTS_GDELT='(agression OR agressé OR fusillade OR "coups de feu" OR poignardé OR "coup de couteau" OR cambriolage OR braquage OR rixe OR interpellé OR incendie OR accident OR meurtre OR homicide OR stupéfiants OR violences OR "tué par balle")';
+function termeCommune(z){
+  const d=z&&z.enrich&&z.enrich.demographie, code=d&&d.code||"";
+  const arr=code.match(/^(751|6938|132)(\d\d?)$/);
+  if(arr){ const n=+arr[2], ville=arr[1]==="751"?"Paris":arr[1]==="6938"?"Lyon":"Marseille"; return {terme:`("${ville} ${n}e" OR "${n}e arrondissement")`,code,nom:`${ville} ${n}e`}; }
+  const nom=(d&&d.nom)||(z&&z.nom)||""; return nom?{terme:`"${nom.replace(/"/g,"")}"`,code,nom}:null;
+}
+const dateGdelt=s=>{ const m=String(s).match(/^(\d{4})(\d\d)(\d\d)T(\d\d)(\d\d)(\d\d)Z$/); return m?new Date(Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+m[6])).toISOString():new Date().toISOString(); };
+let dernierGdelt=0;
+async function chargerGDELT(cible,signal){
+  const attente=6000-(Date.now()-dernierGdelt); if(attente>0) await new Promise(r=>setTimeout(r,attente));
+  dernierGdelt=Date.now();
+  const q=(cible?cible.terme+" ":"")+MOTS_GDELT+" sourcelang:french sourcecountry:france";
+  const txt=await fetchTexte(`https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(q)}&mode=artlist&format=json&maxrecords=${cible?120:150}&timespan=${cible?"14d":"2d"}&sort=datedesc`,signal,30000);
+  let j; try{ j=JSON.parse(txt); }catch(e){ throw new Error(/limit|too many/i.test(txt)?"trop de requêtes, réessaie dans une minute":"réponse inattendue : "+txt.slice(0,80)); }
+  return (j.articles||[]).filter(a=>a.title&&a.url).map(a=>({titre:decEnt(a.title),lien:a.url,date:dateGdelt(a.seendate),categories:[],resume:"",source:String(a.domain||"").replace(/^www\./,""),codeRequete:cible?cible.code:null}));
 }
 let evenements=[]; /* base d'événements analysés, partagée entre zones */
 const CLE_EVT="predictor-evenements";
@@ -1518,23 +1552,44 @@ async function lireEvenements(){
   try{ return JSON.parse(localStorage.getItem(CLE_EVT)||"[]"); }catch(e){ return []; }
 }
 async function sauverEvenements(){
-  const items=evenements.slice(-400);
+  const items=evenements.slice(-350).map(e=>({...e,titre:String(e.titre).slice(0,170),resume:String(e.resume||"").slice(0,160)}));
   if(db&&peutEcrire){ try{ await ecrire(db.doc("evenements/actu17"),{items,version:VERSION,maj:new Date().toISOString()}); }catch(e){ log("Événements non enregistrés : "+erreurDb(e)+".","e"); } return; }
   try{ localStorage.setItem(CLE_EVT,JSON.stringify(items)); }catch(e){}
 }
+const motsTitre=t=>new Set(normTxt(t).replace(/[^a-z0-9 ]/g," ").split(/\s+/).filter(w=>w.length>=4));
+function similarite(a,b){ let n=0; for(const w of a) if(b.has(w)) n++; return n/Math.max(1,Math.min(a.size,b.size)); }
+function trouverDoublon(it,typ){
+  const mt=motsTitre(it.titre), t=new Date(it.date);
+  for(const e of evenements){ if(Math.abs(new Date(e.date)-t)>2.5*86400000) continue;
+    const s=similarite(mt,e._mots||(e._mots=motsTitre(e.titre)));
+    if(s>=0.6||(s>=0.4&&e.type===typ.cle)) return e; }
+  return null;
+}
 async function analyserFlux(items,signal,info){
-  const connus=new Map(evenements.map(e=>[e.lien,e])); let nouveaux=0;
+  const connus=new Set(evenements.flatMap(e=>[e.lien,...(e.liens||[])])); let nouveaux=0, regroupes=0, ignores=0;
+  const aTraiter=[];
   for(const it of items){
-    if(connus.has(it.lien)) continue;
-    const typ=classerEvenement(it.titre+" "+it.resume+" "+it.categories.join(" "));
-    const ex=extraireLieux(it.titre,it.resume);
-    info&&info(`Actu17 · localisation ${nouveaux+1} : ${it.titre.slice(0,50)}…`);
-    let geo={precision:"inconnue"}; try{ geo=await geocoderEvenement(ex,signal); }catch(e){ if(signal&&signal.aborted) throw e; }
-    const e={lien:it.lien,titre:it.titre,date:it.date,categories:it.categories,resume:it.resume.slice(0,280),type:typ.cle,typeLib:typ.lib,gravite:typ.g,voie:ex.voie,...geo,analyse:"règles",version:VERSION};
-    connus.set(it.lien,e); nouveaux++;
+    if(connus.has(it.lien)) continue; connus.add(it.lien);
+    const typ=classerEvenement(it.titre+" "+(it.resume||"")+" "+(it.categories||[]).join(" "));
+    if(typ.cle==="autre"){ ignores++; continue; }
+    const d=trouverDoublon(it,typ);
+    if(d){ d.sources=[...new Set([...(d.sources||[]),it.source])].slice(0,8); d.liens=[...new Set([...(d.liens||[]),it.lien])].slice(0,6); d.nbSources=d.sources.length; regroupes++; continue; }
+    const e={lien:it.lien,titre:it.titre,date:it.date,categories:it.categories||[],resume:(it.resume||"").slice(0,160),type:typ.cle,typeLib:typ.lib,gravite:typ.g,sources:[it.source],liens:[],nbSources:1,precision:"inconnue",analyse:"règles",version:VERSION,_it:it};
+    evenements.push(e); aTraiter.push(e); nouveaux++;
   }
-  evenements=[...connus.values()].sort((a,b)=>a.date<b.date?-1:1).slice(-400);
-  return nouveaux;
+  /* localisation par lots de 4 */
+  let fait=0;
+  for(let i=0;i<aTraiter.length;i+=4){
+    if(signal&&signal.aborted) throw new Error("collecte arrêtée");
+    await Promise.all(aTraiter.slice(i,i+4).map(async e=>{ const it=e._it, ex=extraireLieux(it.titre,it.resume||"");
+      if(!ex.candidats.length&&it.codeRequete) ex.candidats.push({codeInsee:it.codeRequete,poids:1});
+      try{ Object.assign(e,await geocoderEvenement(ex,signal)); }catch(err){ if(signal&&signal.aborted) throw err; }
+      e.voie=ex.voie; delete e._it; fait++; }));
+    info&&info(`Localisation des articles : ${fait}/${aTraiter.length}…`);
+  }
+  evenements.forEach(e=>{ delete e._mots; delete e._it; });
+  evenements=evenements.sort((a,b)=>a.date<b.date?-1:1).slice(-350);
+  return {nouveaux,regroupes,ignores};
 }
 function evenementsZone(z){
   if(!z) return [];
@@ -1559,7 +1614,7 @@ function calculerDanger(z,periode="tout"){
   const accP=acc.filter(a=>periode==="tout"||(periode==="nuit"?(NUIT(a[4])||a[5]>=3):!(NUIT(a[4])||a[5]>=3)));
   for(const a of accP){ const [x,y]=P(a[0],a[1]); deposer(x,y,1+(a[6]>1?0.3:0),"a"); }
   const evz=evenementsZone(z).filter(e=>e.precision==="rue"), maint=Date.now();
-  for(const e of evz){ const [x,y]=P(e.lat,e.lon), age=(maint-new Date(e.date))/86400000; deposer(x,y,e.gravite*Math.pow(0.5,age/120),"e"); }
+  for(const e of evz){ const [x,y]=P(e.lat,e.lon), age=(maint-new Date(e.date))/86400000; deposer(x,y,e.gravite*(1+0.25*((e.nbSources||1)-1))*Math.pow(0.5,age/120),"e"); }
   const nuitF=periode==="nuit"?2:periode==="jour"?0.5:1;
   for(const l of lieux){ let w=0;
     if(["bar","pub","nightclub"].includes(l.t)) w=0.6*nuitF; else if(["fast_food","casino"].includes(l.t)) w=0.25*nuitF;
@@ -1632,28 +1687,48 @@ function rendreEvenementsHTML(){
   const ez=evenementsZone(zone), tous=evenements.slice().reverse();
   const loc=evenements.filter(e=>e.precision!=="inconnue").length;
   const coulG=g=>g>=4?"--bad":g>=3?"--warn":"--muted";
-  const ligne=e=>`<tr><td class="small mono">${new Date(e.date).toLocaleDateString("fr-FR",{day:"2-digit",month:"2-digit"})}</td><td><span class="small" style="color:var(${coulG(e.gravite)})"><b>${esc(e.typeLib)}</b></span><br><a href="${esc(e.lien)}" target="_blank" rel="noopener">${esc(e.titre.slice(0,140))}</a><br><span class="small muted">${e.precision==="inconnue"?"non localisé":esc(e.lieu||"")+" · précision "+e.precision}</span></td></tr>`;
-  if(!evenements.length) return `<p class="empty">Aucun événement chargé. Utilise « Charger l'actualité » (version web) ou importe le flux d'Actu17.</p>`;
+  const src=e=>{ const S=e.sources||["Actu17"]; return esc(S.slice(0,3).join(" · "))+(S.length>3?` +${S.length-3}`:"")+(S.length>1?` <b>(${S.length} sources)</b>`:""); };
+  const ligne=e=>`<tr><td class="small mono">${new Date(e.date).toLocaleDateString("fr-FR",{day:"2-digit",month:"2-digit"})}</td><td><span class="small" style="color:var(${coulG(e.gravite)})"><b>${esc(e.typeLib)}</b></span><br><a href="${esc(e.lien)}" target="_blank" rel="noopener">${esc(String(e.titre).slice(0,140))}</a><br><span class="small muted">${e.precision==="inconnue"?"non localisé":esc(e.lieu||"")+" · précision "+e.precision} · ${src(e)}</span></td></tr>`;
+  if(!evenements.length) return `<p class="empty">Aucun événement chargé. Utilise « Charger l'actualité » (version web) ou importe un flux RSS.</p>`;
   const parType={}; for(const e of evenements) parType[e.typeLib]=(parType[e.typeLib]||0)+1;
-  return `<p class="small muted">${evenements.length} article(s) analysés, ${loc} localisé(s). Types : ${Object.entries(parType).sort((a,b)=>b[1]-a[1]).map(([t,n])=>`${esc(t)} ${n}`).join(" · ")}.</p>
+  const multi=evenements.filter(e=>(e.nbSources||1)>1).length;
+  return `<p class="small muted">${evenements.length} fait(s) répertorié(s), ${loc} localisé(s), ${multi} confirmé(s) par plusieurs sources. Types : ${Object.entries(parType).sort((a,b)=>b[1]-a[1]).map(([t,n])=>`${esc(t)} ${n}`).join(" · ")}.</p>
     <h3>Dans la zone active${zone?" · "+esc(zone.nom):""} (${ez.length})</h3>
-    ${ez.length?`<div class="scroll"><table class="wrapt"><tbody>${ez.slice().reverse().map(ligne).join("")}</tbody></table></div>`:`<p class="small muted">Aucun événement récent localisé dans cette zone.</p>`}
-    <details><summary class="small">Tous les événements récents (${tous.length})</summary><div class="scroll"><table class="wrapt"><tbody>${tous.slice(0,80).map(ligne).join("")}</tbody></table></div></details>
-    <p class="small muted">Analyse automatique par mots-clés et géocodage officiel (geo.api.gouv.fr, Base Adresse Nationale). Predictor ne relève aucun nom de personne.</p>`;
+    ${ez.length?`<div class="scroll"><table class="wrapt"><tbody>${ez.slice().reverse().map(ligne).join("")}</tbody></table></div>`:`<p class="small muted">Aucun fait récent localisé dans cette zone.</p>`}
+    <details><summary class="small">Tous les faits récents (${tous.length})</summary><div class="scroll"><table class="wrapt"><tbody>${tous.slice(0,100).map(ligne).join("")}</tbody></table></div></details>
+    <p class="small muted">Analyse automatique par mots-clés, regroupement des articles qui décrivent le même fait, géocodage officiel (geo.api.gouv.fr, Base Adresse Nationale). Predictor ne relève aucun nom de personne.</p>`;
+}
+function rendreSourcesHTML(){
+  const L=Object.entries(etatSources); if(!L.length) return "";
+  return `<div class="scroll"><table class="wrapt"><thead><tr><th>Source</th><th>État</th></tr></thead><tbody>${L.map(([nom,e])=>`<tr><td>${esc(nom)}</td><td class="small" style="color:var(${e.ok?"--ok":"--bad"})">${esc(e.txt)}</td></tr>`).join("")}</tbody></table></div>
+    <p class="small muted">Pour ajouter un flux RSS : modifie le fichier <span class="mono">data/sources.txt</span> de ton dépôt GitHub (une ligne par source : <span class="mono">identifiant|Nom|adresse du flux</span>). Le robot le recopie chaque heure.</p>`;
+}
+async function collecterPresse(sig,info,z){
+  const items=[]; etatSources={};
+  await chargerListeSources(sig);
+  for(const src of sourcesPresse){ info&&info(`Presse · ${src.nom}…`);
+    try{ const f=await chargerFlux(src,sig); items.push(...f.items); etatSources[src.nom]={ok:true,txt:`${f.items.length} article(s) (${f.mode})`}; }
+    catch(e){ if(sig&&sig.aborted) throw e; etatSources[src.nom]={ok:false,txt:"indisponible ("+(e.message||e)+")"}; } }
+  const cible=termeCommune(z);
+  if(cible){ info&&info(`Presse française (GDELT) · ${cible.nom}…`);
+    try{ const a=await chargerGDELT(cible,sig); items.push(...a); etatSources[`GDELT · ${cible.nom} (14 j)`]={ok:true,txt:`${a.length} titre(s) de ${new Set(a.map(x=>x.source)).size} site(s)`}; }
+    catch(e){ if(sig&&sig.aborted) throw e; etatSources[`GDELT · ${cible.nom} (14 j)`]={ok:false,txt:"indisponible ("+(e.message||e)+")"}; } }
+  info&&info("Presse française (GDELT) · toute la France…");
+  try{ const a=await chargerGDELT(null,sig); items.push(...a); etatSources["GDELT · toute la France (48 h)"]={ok:true,txt:`${a.length} titre(s) de ${new Set(a.map(x=>x.source)).size} site(s)`}; }
+  catch(e){ if(sig&&sig.aborted) throw e; etatSources["GDELT · toute la France (48 h)"]={ok:false,txt:"indisponible ("+(e.message||e)+")"}; }
+  const b=$("sourcesEtat"); if(b) b.innerHTML=rendreSourcesHTML();
+  if(!items.length) throw new Error("aucune source joignable");
+  const r=await analyserFlux(items,sig,info);
+  await sauverEvenements(); rendreEvenements();
+  const nbSites=new Set(items.map(x=>x.source)).size;
+  return `${items.length} article(s) lus sur ${nbSites} site(s) · ${r.nouveaux} nouveau(x) fait(s), ${r.regroupes} doublon(s) regroupé(s), ${r.ignores} hors sujet · ${evenementsZone(z).length} dans la zone`;
 }
 async function chargerActualite(){
-  const sig=chargeurDebut("Actualité · Actu17"); $("btnActu").disabled=true;
-  try{
-    etapeUI("actu","Actu17 · lecture du flux…","cours");
-    const f=await chargerFluxActu17(sig,m=>etapeUI("actu",m,"cours"));
-    etapeUI("actu",`Actu17 : ${f.items.length} article(s) lus (${f.source})`,"ok");
-    etapeUI("actuloc","Analyse et localisation des articles…","cours");
-    const n=await analyserFlux(f.items,sig,m=>etapeUI("actuloc",m,"cours"));
-    const loc=evenements.filter(e=>e.precision!=="inconnue").length;
-    etapeUI("actuloc",`${n} nouvel(s) article(s) analysé(s) · ${loc}/${evenements.length} localisé(s) · ${evenementsZone(zone).length} dans la zone`,"ok");
-    log(`Actu17 : ${f.items.length} articles lus via ${f.source}, ${n} nouveaux analysés.`,"o");
-    await sauverEvenements(); rendreEvenements(); toutAfficher(false);
-  }catch(e){ etapeUI("actu","Actu17 : échec ("+(e.message||e)+")","err"); log("Actu17 : "+(e.message||e),"e"); }
+  const sig=chargeurDebut("Actualité · presse"); $("btnActu").disabled=true;
+  try{ etapeUI("actu","Presse…","cours");
+    const msg=await collecterPresse(sig,m=>etapeUI("actu",m,"cours"),zone);
+    etapeUI("actu","Presse : "+msg,"ok"); log("Presse : "+msg+".","o"); toutAfficher(false); }
+  catch(e){ etapeUI("actu","Presse : échec ("+(e.message||e)+")","err"); log("Presse : "+(e.message||e),"e"); }
   finally{ $("btnActu").disabled=false; chargeurFin(); }
 }
 function rendreEvenements(){ const b=$("evt"); if(b) b.innerHTML=rendreEvenementsHTML(); }
@@ -2085,10 +2160,10 @@ const OUTILS=[
     const D=zone.enrich&&zone.enrich.delinquance;
     return {periode:p,secteurs:d.chauds,accidents_utilises:d.nAcc,evenements_utilises:d.nEv,poids_pct:d.poids,validation:d.validation,fiabilite_pct:d.fiab,
       delinquance_commune:D?{code:D.code,annee:D.annee,indicateurs:D.indicateurs.slice(0,14).map(x=>({indicateur:x.indicateur,taux_pour_mille:x.taux,taux_annee_precedente:x.tauxPrec}))}:null}; }},
- {name:"evenements", description:"Événements d'actualité issus d'Actu17, analysés par Predictor (date, type, gravité 1-5, titre, lieu, précision rue/commune/département, lien). Argument optionnel portee : zone (par défaut) ou tous ; limite (max 60).",
+ {name:"evenements", description:"Faits d'actualité issus d'Actu17, des flux RSS ajoutés et des titres de la presse française (GDELT), regroupés quand plusieurs articles parlent du même fait, analysés par Predictor (date, type, gravité 1-5, titre, lieu, précision rue/commune/département, lien). Argument optionnel portee : zone (par défaut) ou tous ; limite (max 60).",
   inputSchema:{type:"object",properties:{portee:{type:"string"},limite:{type:"number"}}},
   execute(i){ const L=(i.portee==="tous"?evenements:evenementsZone(zone)).slice().reverse().slice(0,Math.max(1,Math.min(60,Number(i.limite)||30)));
-    return {total:evenements.length,dans_zone:zone?evenementsZone(zone).length:0,evenements:L.map(e=>({date:e.date.slice(0,10),type:e.typeLib,gravite:e.gravite,titre:e.titre,resume:e.resume,lieu:e.lieu||null,precision:e.precision,lien:e.lien}))}; }},
+    return {total:evenements.length,dans_zone:zone?evenementsZone(zone).length:0,evenements:L.map(e=>({date:e.date.slice(0,10),type:e.typeLib,gravite:e.gravite,titre:e.titre,resume:e.resume,lieu:e.lieu||null,precision:e.precision,lien:e.lien,sources:e.sources||["Actu17"]}))}; }},
  {name:"etat_technique", description:"État technique de Predictor : version, mémoire, réseau, appareil, zone active, volumes de données, erreurs et journal récents.",
   execute(){ return etatTechnique(); }}
 ];
