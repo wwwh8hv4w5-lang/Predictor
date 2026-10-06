@@ -6,7 +6,7 @@
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
 </head>
 <body>
-<title>Predictor v0.7</title>
+<title>Predictor v0.8</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
 <style>
@@ -86,7 +86,26 @@ td.num,th.num{text-align:right}
 .zone{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:3px;padding:6px 8px}
 .zone.cur{border-color:var(--accent)}
 .ok-t{color:var(--ok)} .bad-t{color:var(--bad)}
-#enrichBox{display:flex;flex-direction:column;gap:3px}
+#etapesBox{display:flex;flex-direction:column;gap:4px}
+.etape{display:flex;gap:8px;align-items:flex-start;font-family:var(--font-data);font-size:12px;min-width:0;overflow-wrap:anywhere}
+.etape .ic{flex:0 0 14px;height:14px;margin-top:1px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;line-height:1}
+.etape.ok{color:var(--ok)} .etape.ok .ic::before{content:"✓"}
+.etape.err{color:var(--bad)} .etape.err .ic::before{content:"✕"}
+.etape.info{color:var(--muted)} .etape.info .ic::before{content:"·"}
+.spin,.etape.cours .ic{width:12px;height:12px;flex:0 0 12px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:tourne .8s linear infinite;display:inline-block;vertical-align:-2px}
+@keyframes tourne{to{transform:rotate(360deg)}}
+body:has(#chargeur:not([hidden])) .wrap{padding-bottom:120px}
+#chargeur{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--panel);border-top:1px solid var(--accent);box-shadow:0 -4px 16px rgba(0,0,0,.25);padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:6px}
+#chargeur .ligne{display:flex;align-items:center;gap:10px;min-width:0}
+#chargeur .txt{flex:1;min-width:0;display:flex;flex-direction:column}
+#chargeur .txt b{font-family:var(--font-data);font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#chargeur .txt span{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#chargeur .spin{width:20px;height:20px;flex:0 0 20px;border-width:3px}
+#chTemps{font-family:var(--font-data);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.barre-ind{height:3px;border-radius:2px;background:var(--line);overflow:hidden;position:relative}
+.barre-ind::after{content:"";position:absolute;top:0;bottom:0;width:35%;background:var(--accent);border-radius:2px;animation:glisse 1.3s ease-in-out infinite}
+@keyframes glisse{0%{left:-35%}100%{left:100%}}
+@media (prefers-reduced-motion:reduce){.spin,.etape.cours .ic,.barre-ind::after{animation-duration:3s}}
 .ia-out{white-space:pre-wrap;font-size:13.5px;line-height:1.55;max-width:75ch;min-width:0;overflow-wrap:anywhere}
 .ia-out:empty{display:none}
 .tool{font-family:var(--font-data);font-size:11px;color:var(--muted)}
@@ -103,7 +122,7 @@ details.rap .ia-out{margin-top:6px}
 
 <div class="wrap">
 <header>
-  <h1>PREDICTOR <small id="verTag">v0.7 · F.S.M Game House</small></h1>
+  <h1>PREDICTOR <small id="verTag">v0.8 · F.S.M Game House</small></h1>
   <div class="pills">
     <span class="pill" id="pillDb">Mémoire : …</span>
     <span class="pill" id="pillNet">Réseau direct : non testé</span>
@@ -112,15 +131,26 @@ details.rap .ia-out{margin-top:6px}
   </div>
 </header>
 
+<div id="chargeur" role="status" aria-live="polite" hidden>
+  <div class="ligne"><span class="spin" aria-hidden="true"></span><div class="txt"><b id="chTitre">Chargement…</b><span id="chEtape"></span></div><span id="chTemps">0 s</span><button id="chStop">Arrêter</button></div>
+  <div class="barre-ind" aria-hidden="true"></div>
+</div>
+
 <section id="secZone" aria-labelledby="hZone">
   <h2 id="hZone">1 · Collecte</h2>
+  <div class="row">
+    <div class="field" style="flex:1;min-width:200px"><label for="inRecherche">Rechercher un lieu (ville, quartier, adresse, partout dans le monde)</label>
+      <input id="inRecherche" type="search" enterkeyhint="search" placeholder="ex. Clichy-la-Garenne, Lyon Part-Dieu, 10 rue de Rivoli Paris"></div>
+    <button id="btnRecherche">Rechercher</button>
+  </div>
+  <div id="resRecherche" class="zones"></div>
   <div class="row">
     <div class="field"><label for="selVille">Ville</label>
       <select id="selVille"></select></div>
     <div class="field"><label for="inLat">Latitude</label><input id="inLat" type="number" step="0.0001"></div>
     <div class="field"><label for="inLon">Longitude</label><input id="inLon" type="number" step="0.0001"></div>
     <div class="field"><label for="selRayon">Rayon</label>
-      <select id="selRayon"><option value="300">300 m</option><option value="500">500 m</option><option value="800" selected>800 m</option><option value="1000">1 km</option><option value="1500">1,5 km</option></select></div>
+      <select id="selRayon"><option value="300">300 m</option><option value="500">500 m</option><option value="800" selected>800 m</option><option value="1000">1 km</option><option value="1500">1,5 km</option><option value="2000">2 km</option><option value="3000">3 km</option></select></div>
     <div class="field" style="flex:1;min-width:140px"><label for="inNom">Nom de la zone</label><input id="inNom" type="text" placeholder="ex. Paris centre"></div>
   </div>
   <div class="row">
@@ -130,10 +160,7 @@ details.rap .ia-out{margin-top:6px}
     <button id="btnExport">Exporter la zone</button>
   </div>
   <p class="small muted" style="margin:0">« Enrichir la zone » ajoute la démographie INSEE, la météo des 92 derniers jours, la précision météo mesurée et les comptages réels (Paris), puis cale le moteur. Il faut un accès réseau direct (version web GitHub). « Exporter la zone » crée un fichier à importer dans Predictor ouvert dans Claude pour l'enregistrer en mémoire.</p>
-  <div id="enrichBox" hidden>
-    <span id="en-demo" class="small mono"></span><span id="en-meteo" class="small mono"></span><span id="en-fiab" class="small mono"></span>
-    <span id="en-velo" class="small mono"></span><span id="en-trafic" class="small mono"></span><span id="en-cal" class="small mono"></span>
-  </div>
+  <div id="etapesBox" aria-live="polite" hidden></div>
   <div class="links" id="linksBox" hidden>
     <div class="linkline"><span class="mono">A · Carte (OpenStreetMap)</span> <a id="lnkCarte" href="#" target="_blank" rel="noopener">obtenir le fichier</a> <button id="cpCarte">Copier le lien</button></div>
     <p class="small muted" style="margin:0">Le lien ouvre Overpass Turbo, qui lance la collecte de la zone tout seul (jusqu'à une minute ; accepte l'avertissement « beaucoup de données » s'il apparaît). Touche ensuite <b>Exporter</b>, puis le bouton <b>télécharger</b> de la ligne « données brutes » ou « GeoJSON ».</p>
@@ -205,7 +232,7 @@ details.rap .ia-out{margin-top:6px}
 <script>
 "use strict";
 /* ===================== Constantes ===================== */
-const VERSION = "0.7"; /* version unique du projet : incrémentée à chaque évolution */
+const VERSION = "0.8"; /* version unique du projet : incrémentée à chaque évolution */
 const VILLES = [
  ["Paris",48.8566,2.3522],["Lyon",45.7640,4.8357],["Marseille",43.2965,5.3698],["Toulouse",43.6047,1.4442],
  ["Nice",43.7102,7.2620],["Nantes",47.2184,-1.5536],["Strasbourg",48.5734,7.7521],["Montpellier",43.6108,3.8767],
@@ -382,7 +409,7 @@ function zoneDepuisForm(){
 }
 function requeteOverpass(z){
   const a=`(around:${z.rayon},${z.lat},${z.lon})`;
-  return `[out:json][timeout:120];(way["highway"]${a};);out geom;(node["amenity"]${a};node["shop"]${a};node["tourism"]${a};node["leisure"]${a};node["healthcare"]${a};node["office"]${a};way["amenity"]${a};way["shop"]${a};way["tourism"]${a};way["leisure"]${a};);out center tags;(node["public_transport"]${a};node["highway"="bus_stop"]${a};node["railway"~"^(station|halt|tram_stop|subway_entrance|stop)$"]${a};)->.s;.s out;rel(bn.s)["route"~"^(bus|trolleybus|tram|subway|train|light_rail|monorail)$"];out body;`;
+  return `[out:json][timeout:180];(way["highway"]${a};);out geom;(node["amenity"]${a};node["shop"]${a};node["tourism"]${a};node["leisure"]${a};node["healthcare"]${a};node["office"]${a};way["amenity"]${a};way["shop"]${a};way["tourism"]${a};way["leisure"]${a};);out center tags;(node["public_transport"]${a};node["highway"="bus_stop"]${a};node["railway"~"^(station|halt|tram_stop|subway_entrance|stop)$"]${a};)->.s;.s out;rel(bn.s)["route"~"^(bus|trolleybus|tram|subway|train|light_rail|monorail)$"];out body;`;
 }
 function urlCarte(z){ return "https://overpass-api.de/api/interpreter?data="+encodeURIComponent(requeteOverpass(z)); }
 function urlCarteFichier(z){ return "https://overpass-turbo.eu/?Q="+encodeURIComponent(requeteOverpass(z))+"&C="+z.lat+";"+z.lon+";15&R"; }
@@ -635,7 +662,7 @@ async function traiterJson(json,source){
   const z=zoneCible(); if(!z) return;
   if(Array.isArray(json.elements)){
     let res; try{ res=integrerCarte(json,z); }catch(e){ log("Carte non intégrée : "+e.message+". Vérifie que le lien correspond à cette zone.","e"); return; }
-    if(!zone||zone.id!==z.id) suiviActuel=await lireSuivi(z.id);
+    if(!zone||zone.id!==z.id){ suiviActuel=await lireSuivi(z.id); selection=null; }
     zone=z; lieux=res.lieux.map(prepLieu); rues=res.rues; if(res.transport) zone.transport=res.transport;
     zone.majCarte=new Date().toISOString();
     zone.stats=analyser();
@@ -645,11 +672,11 @@ async function traiterJson(json,source){
     toutAfficher(true); await sauverZone(true);
   } else if(json.daily){
     let m; try{ m=integrerMeteo(json); }catch(e){ log("Météo non intégrée : "+e.message+".","e"); return; }
-    if(!zone||zone.id!==z.id) suiviActuel=await lireSuivi(z.id);
+    if(!zone||zone.id!==z.id){ suiviActuel=await lireSuivi(z.id); lieux=[]; rues=[]; selection=null; }
     zone=z; zone.meteo=m;
     if(json.latitude&&Math.abs(json.latitude-zone.lat)>0.2) log("Attention : ces prévisions semblent concerner un autre lieu que la zone active.","w");
     log(`Météo intégrée : ${m.jours.length} jours de prévisions.`,"o");
-    if(!lieux.length&&zone.nLieuxChunks) await chargerDonnees(zone);
+    if(db&&!lieux.length&&zone.nLieuxChunks) await chargerDonnees(zone);
     toutAfficher(false); await sauverZone(false);
   } else log("Données non reconnues : ni carte OpenStreetMap ni météo Open-Meteo.","e");
 }
@@ -677,19 +704,95 @@ async function testerReseau(){
   $("pillNet").textContent="Réseau direct : "+etatReseau; $("pillNet").className="pill "+(m.ok&&o.ok?"ok":ok?"warn":"bad");
   return ok;
 }
+const SERVEURS_OVERPASS=["https://overpass-api.de/api/interpreter","https://overpass.kumi.systems/api/interpreter","https://overpass.private.coffee/api/interpreter"];
+async function telechargerCarte(z,signal,info){
+  const q=requeteOverpass(z), t0=Date.now(); let derniere="";
+  for(const url of SERVEURS_OVERPASS){
+    const hote=new URL(url).host; info&&info(`Carte OpenStreetMap · ${hote}…`);
+    const ctl=new AbortController(), t=setTimeout(()=>ctl.abort(),150000), stop=()=>ctl.abort();
+    signal&&signal.addEventListener("abort",stop,{once:true});
+    try{
+      const r=await fetch(url,{method:"POST",body:"data="+encodeURIComponent(q),headers:{"Content-Type":"application/x-www-form-urlencoded"},signal:ctl.signal});
+      if(!r.ok) throw new Error(r.status===429?"serveur saturé (429)":r.status===504?"délai dépassé côté serveur (504)":"réponse HTTP "+r.status);
+      info&&info(`Carte OpenStreetMap · réception des données (${hote})…`);
+      const txt=await r.text(); let j; try{ j=JSON.parse(txt); }catch(e){ throw new Error("réponse illisible"); }
+      const n=(j.elements||[]).length;
+      if(!n) throw new Error(j.remark?"erreur serveur : "+String(j.remark).slice(0,90):"aucune donnée renvoyée");
+      if(j.remark) log(`Carte : réponse partielle de ${hote} (${String(j.remark).slice(0,90)}).`,"w");
+      return {json:j,serveur:hote,ms:Date.now()-t0,n};
+    }catch(e){
+      if(signal&&signal.aborted) throw new Error("collecte arrêtée");
+      derniere=hote+" : "+(e.name==="AbortError"?"pas de réponse en 150 s":(e.message||e));
+      log(`Carte : échec sur ${derniere}. Essai du serveur suivant…`,"w");
+    }finally{ clearTimeout(t); signal&&signal.removeEventListener("abort",stop); }
+  }
+  throw new Error("tous les serveurs ont échoué (dernier : "+derniere+")");
+}
 async function collecteDirecte(){
   const z=zoneDepuisForm(); if(!z) return;
-  log("Tentative de collecte directe…");
-  await testerReseau();
-  if(!diagReseau.meteo.ok&&!diagReseau.carte.ok){ log("Collecte directe impossible : aucun service joignable depuis cette page (détail ci-dessus). Utilise les liens A, B ou C.","w"); preparer(); return; }
-  const taches=[]; if(diagReseau.carte.ok) taches.push(["carte",urlCarte(z)]); if(diagReseau.meteo.ok) taches.push(["météo",urlMeteo(z)]);
-  for(const [nom,u] of taches){
-    log(`Téléchargement direct de la ${nom}…`);
-    try{ const r=await fetch(u); if(!r.ok) throw new Error("réponse HTTP "+r.status); await traiterImport(await r.text()); }
-    catch(e){ log(`Échec du téléchargement direct de la ${nom} (${e.message||e}). Utilise le lien correspondant.`,"e"); }
-  }
-  if(zone) await enrichir();
+  if(z.rayon>1500) log(`Grande zone (${z.rayon/1000} km) : la collecte peut prendre plusieurs minutes.`,"w");
+  const sig=chargeurDebut("Collecte directe · "+z.nom); $("btnDirect").disabled=true;
+  log(`Collecte directe de « ${z.nom} » (${z.lat.toFixed(4)}, ${z.lon.toFixed(4)}, rayon ${z.rayon} m)…`);
+  try{
+    etapeUI("reseau","Test du réseau…","cours");
+    await testerReseau();
+    if(!diagReseau.meteo.ok&&!diagReseau.carte.ok){ etapeUI("reseau","Réseau : aucun service joignable depuis cette page. Utilise les liens A, B ou C.","err"); preparer(); return; }
+    etapeUI("reseau",`Réseau : Open-Meteo ${diagReseau.meteo.ok?"OK":"indisponible"} · OpenStreetMap ${diagReseau.carte.ok?"OK":"indisponible (serveurs de secours essayés)"}`,"ok");
+    etapeUI("carte",`Carte OpenStreetMap (rayon ${z.rayon} m)…`,"cours");
+    try{
+      const c=await telechargerCarte(z,sig,m=>etapeUI("carte",m,"cours"));
+      await traiterJson(c.json,"Overpass ("+c.serveur+")");
+      if(!zone||zone.id!==z.id||!lieux.length&&!rues.length) throw new Error("données reçues mais non intégrées (voir journal)");
+      etapeUI("carte",`Carte : ${fmt(lieux.length)} lieux, ${fmt(rues.length)} segments${zone.transport?", "+zone.transport.lignes.length+" lignes de transport":""} (${c.serveur}, ${Math.round(c.ms/1000)} s)`,"ok");
+    }catch(e){ etapeUI("carte","Carte : échec ("+(e.message||e)+")","err"); log("Carte : échec ("+(e.message||e)+").","e"); if(sig.aborted) return; }
+    etapeUI("meteo","Prévisions météo 7 jours…","cours");
+    try{ const j=await getJSON(urlMeteo(z),30000,sig); await traiterJson(j); if(!zone||!zone.meteo) throw new Error("données non intégrées"); etapeUI("meteo","Météo : 7 jours de prévisions","ok"); }
+    catch(e){ etapeUI("meteo","Météo : échec ("+(e.message||e)+")","err"); log("Météo : échec ("+(e.message||e)+").","e"); if(sig.aborted) return; }
+    if(zone&&zone.id===z.id) await enrichir();
+  }finally{ $("btnDirect").disabled=false; chargeurFin(); }
 }
+
+/* ===================== Chargement (animation et étapes) ===================== */
+const CH={n:0,t0:0,ctl:null,timer:null};
+function majChrono(){ const s=Math.round((Date.now()-CH.t0)/1000); $("chTemps").textContent=s<60?s+" s":Math.floor(s/60)+" min "+String(s%60).padStart(2,"0"); }
+function chargeurDebut(titre){
+  CH.n++;
+  if(CH.n===1){ CH.t0=Date.now(); CH.ctl=new AbortController(); $("etapesBox").innerHTML=""; $("etapesBox").hidden=false; $("chargeur").hidden=false; $("chEtape").textContent=""; CH.timer=setInterval(majChrono,500); majChrono(); }
+  $("chTitre").textContent=titre; return CH.ctl.signal;
+}
+function chargeurFin(){ CH.n=Math.max(0,CH.n-1); if(!CH.n){ clearInterval(CH.timer); $("chargeur").hidden=true; } }
+function etapeUI(cle,txt,etat){
+  let el=document.getElementById("et-"+cle);
+  if(!el){ el=document.createElement("div"); el.id="et-"+cle; $("etapesBox").appendChild(el); }
+  el.className="etape "+etat; el.innerHTML=`<span class="ic" aria-hidden="true"></span><span>${esc(txt)}</span>`;
+  if(etat==="cours") $("chEtape").textContent=txt;
+}
+$("chStop").addEventListener("click",()=>{ if(CH.ctl){ CH.ctl.abort(); log("Collecte arrêtée à ta demande.","w"); $("chEtape").textContent="Arrêt en cours…"; } });
+
+/* ===================== Recherche de lieu (géocodage) ===================== */
+let rechercheRes=[];
+async function rechercherLieu(){
+  const q=$("inRecherche").value.trim(), box=$("resRecherche"); if(q.length<2) return;
+  box.innerHTML='<p class="small muted"><span class="spin"></span> Recherche de « '+esc(q)+' »…</p>';
+  let res=[];
+  try{ const j=await getJSON(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=8&language=fr&format=json`,15000);
+    res=(j.results||[]).map(x=>({nom:x.name,detail:[x.admin3,x.admin2,x.admin1,x.country].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).join(", "),lat:x.latitude,lon:x.longitude,pop:x.population||0})); }catch(e){}
+  if(!res.length||/\d/.test(q)||q.split(/\s+/).length>2){
+    try{ const j=await getJSON(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=8&accept-language=fr&q=${encodeURIComponent(q)}`,15000);
+      const vus=new Set(res.map(x=>x.lat.toFixed(3)+x.lon.toFixed(3)));
+      for(const x of (Array.isArray(j)?j:[])){ const la=+x.lat, lo=+x.lon, k=la.toFixed(3)+lo.toFixed(3); if(vus.has(k)) continue; vus.add(k);
+        res.push({nom:x.name||String(x.display_name).split(",")[0],detail:String(x.display_name).split(",").slice(1).join(",").trim(),lat:la,lon:lo,pop:0}); } }catch(e){}
+  }
+  rechercheRes=res.slice(0,10);
+  if(!rechercheRes.length){ box.innerHTML=`<p class="small muted">Aucun résultat pour « ${esc(q)} ». La recherche demande un accès réseau direct (version web GitHub).</p>`; return; }
+  box.innerHTML=rechercheRes.map((x,i)=>`<div class="zone"><div class="meta"><b>${esc(x.nom)}</b> <span class="small muted">${esc(x.detail)}${x.pop?" · "+fmt(x.pop)+" hab.":""}</span><br><span class="small muted mono">${x.lat.toFixed(4)}, ${x.lon.toFixed(4)}</span></div><button data-geo="${i}">Choisir</button></div>`).join("");
+}
+$("btnRecherche").addEventListener("click",rechercherLieu);
+$("inRecherche").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); rechercherLieu(); } });
+$("resRecherche").addEventListener("click",e=>{ const b=e.target.closest("button[data-geo]"); if(!b) return; const x=rechercheRes[+b.dataset.geo]; if(!x) return;
+  $("inLat").value=x.lat.toFixed(5); $("inLon").value=x.lon.toFixed(5); $("inNom").value=x.nom.slice(0,60); $("selVille").value="";
+  $("resRecherche").innerHTML=`<p class="small ok-t">Zone choisie : <b>${esc(x.nom)}</b> (${x.lat.toFixed(4)}, ${x.lon.toFixed(4)}). Règle le rayon puis lance « Tenter la collecte directe ».</p>`;
+  log(`Lieu choisi : ${x.nom} (${x.lat.toFixed(4)}, ${x.lon.toFixed(4)}).`); });
 
 /* ===================== Analyse ===================== */
 function distM(a,b){ const [x1,y1]=proj(a[0],a[1]),[x2,y2]=proj(b[0],b[1]); return Math.hypot(x2-x1,y2-y1); }
@@ -718,7 +821,7 @@ function activite(){
   let max=0; for(const r of g) for(const v of r) max=Math.max(max,v);
   return g.map(r=>r.map(v=>max?Math.round(100*v/max):0));
 }
-function fiabActivite(){ if(!lieux.length) return 0; const cov=zone.stats.avecHoraires/lieux.length;
+function fiabActivite(){ if(!lieux.length||!zone||!zone.stats) return 0; const cov=zone.stats.avecHoraires/lieux.length;
   return Math.round(Math.min(60,25+35*cov+(lieux.length>200?5:0))); }
 function facteurMeteo(j){
   let f=1; const raisons=[];
@@ -868,13 +971,14 @@ const EQUIPEMENTS=[
 
 /* ===================== Enrichissement par sources réelles ===================== */
 const ODS="https://opendata.paris.fr/api/explore/v2.1/catalog/datasets/";
-async function getJSON(url,delai=45000){
-  const ctl=new AbortController(), t=setTimeout(()=>ctl.abort(),delai);
+async function getJSON(url,delai=45000,signal){
+  const ctl=new AbortController(), t=setTimeout(()=>ctl.abort(),delai), stop=()=>ctl.abort();
+  if(signal){ if(signal.aborted) throw new Error("collecte arrêtée"); signal.addEventListener("abort",stop,{once:true}); }
   try{ const r=await fetch(url,{signal:ctl.signal});
     if(!r.ok){ let detail=""; try{ detail=(await r.text()).slice(0,180); }catch(e){} throw new Error("HTTP "+r.status+(detail?" · "+detail:"")); }
     return await r.json();
-  }catch(e){ if(e.name==="AbortError") throw new Error(`pas de réponse en ${delai/1000} s`); throw e; }
-  finally{ clearTimeout(t); }
+  }catch(e){ if(signal&&signal.aborted) throw new Error("collecte arrêtée"); if(e.name==="AbortError") throw new Error(`pas de réponse en ${delai/1000} s`); throw e; }
+  finally{ clearTimeout(t); if(signal) signal.removeEventListener("abort",stop); }
 }
 const dateISO=d=>d.toISOString().slice(0,10);
 function urlDemographie(z,type){ return `https://geo.api.gouv.fr/communes?lat=${z.lat}&lon=${z.lon}${type?"&type="+type:""}&fields=nom,code,population,surface,codesPostaux,codeDepartement,codeRegion&format=json`; }
@@ -887,12 +991,12 @@ const SOURCES_COMPTAGE={
   velo:{nom:"Compteurs vélo (Ville de Paris)",jeu:"comptage-velo-donnees-compteurs",geo:"coordinates",date:"date",val:"sum_counts",lib:"nom_compteur",unite:"passages de vélos"},
   trafic:{nom:"Comptages routiers (Ville de Paris)",jeu:"comptages-routiers-permanents",geo:"geo_point_2d",date:"t_1h",val:"q",lib:"libelle",unite:"véhicules"}
 };
-async function chargerComptage(cle,z,jours=56){
+async function chargerComptage(cle,z,jours=56,signal){
   const S=SOURCES_COMPTAGE[cle], debut=dateISO(new Date(Date.now()-jours*86400000)), w=whereZone(S.geo,S.date,z,debut);
-  const serie=await getJSON(`${ODS}${S.jeu}/exports/json?select=${S.date}%20as%20t,sum(${S.val})%20as%20n&where=${w}&group_by=${S.date}&order_by=${S.date}&timezone=Europe%2FParis`,60000);
+  const serie=await getJSON(`${ODS}${S.jeu}/exports/json?select=${S.date}%20as%20t,sum(${S.val})%20as%20n&where=${w}&group_by=${S.date}&order_by=${S.date}&timezone=Europe%2FParis`,60000,signal);
   if(!Array.isArray(serie)) throw new Error("réponse inattendue");
   let capteurs=[];
-  try{ const r=await getJSON(`${ODS}${S.jeu}/records?select=${S.lib}%20as%20nom,sum(${S.val})%20as%20n&where=${w}&group_by=${S.lib}&order_by=n%20desc&limit=50`,45000);
+  try{ const r=await getJSON(`${ODS}${S.jeu}/records?select=${S.lib}%20as%20nom,sum(${S.val})%20as%20n&where=${w}&group_by=${S.lib}&order_by=n%20desc&limit=50`,45000,signal);
     capteurs=(r.results||[]).map(x=>x.nom).filter(Boolean); }catch(e){}
   return {source:S.nom,unite:S.unite,capteurs,debut,serie:serie.filter(x=>x&&x.t!=null&&x.n!=null).map(x=>[String(x.t).slice(0,13),Math.round(+x.n)])};
 }
@@ -996,51 +1100,53 @@ let suiviActuel=[];
 
 /* ===================== Orchestration de l'enrichissement ===================== */
 let enrichEnCours=false;
-function etatEnrich(cle,txt,kind){ const el=$("en-"+cle); if(el){ el.textContent=txt; el.className="small mono "+(kind||""); } }
 async function enrichir(){
   if(!zone){ log("Enrichissement impossible : aucune zone active.","w"); return; }
-  if(enrichEnCours) return; enrichEnCours=true; $("btnEnrich").disabled=true; $("enrichBox").hidden=false;
+  if(enrichEnCours) return; enrichEnCours=true; $("btnEnrich").disabled=true;
   const z=zone, E=z.enrich=z.enrich||{}; let reussites=0;
+  const sig=chargeurDebut("Enrichissement · "+z.nom);
   log(`Enrichissement de « ${z.nom} »…`);
-  const etape=async(cle,libelle,fn)=>{ etatEnrich(cle,libelle+" : en cours…");
-    try{ const msg=await fn(); etatEnrich(cle,libelle+" : "+msg,"ok-t"); reussites++; log(`${libelle} : ${msg}.`,"o"); }
-    catch(e){ const m=e&&e.message||String(e); etatEnrich(cle,libelle+" : échec ("+m+")","bad-t"); log(`${libelle} : échec (${m}).`,"e"); } };
+  const etape=async(cle,libelle,fn)=>{ etapeUI(cle,libelle+"…","cours");
+    try{ const msg=await fn(); etapeUI(cle,libelle+" : "+msg,"ok"); reussites++; log(`${libelle} : ${msg}.`,"o"); }
+    catch(e){ const m=e&&e.message||String(e); etapeUI(cle,libelle+" : échec ("+m+")","err"); log(`${libelle} : échec (${m}).`,"e"); } };
+  try{
   await Promise.all([
     etape("demo","Démographie (INSEE via geo.api.gouv.fr)",async()=>{
-      let r=[]; try{ r=await getJSON(urlDemographie(z,"arrondissement-municipal")); }catch(e){}
-      if(!Array.isArray(r)||!r.length) r=await getJSON(urlDemographie(z,""));
+      let r=[]; try{ r=await getJSON(urlDemographie(z,"arrondissement-municipal"),30000,sig); }catch(e){ if(sig.aborted) throw e; }
+      if(!Array.isArray(r)||!r.length) r=await getJSON(urlDemographie(z,""),30000,sig);
+      if(!Array.isArray(r)||!r.length){ E.demographie=null; return "hors de France ou aucune commune à ces coordonnées"; }
       if(!Array.isArray(r)||!r.length) throw new Error("aucune commune trouvée à ces coordonnées");
       const c=r[0]; E.demographie={nom:c.nom,code:c.code,population:c.population??null,surfaceKm2:c.surface!=null?c.surface/100:null,codesPostaux:c.codesPostaux||[],departement:c.codeDepartement||"",date:new Date().toISOString()};
       return `${c.nom}, ${c.population!=null?fmt(c.population)+" habitants":"population inconnue"}`; }),
-    etape("meteo","Météo passée (92 jours)",async()=>{
-      const j=await getJSON(urlMeteoPasse(z)); const d=j.daily; if(!d||!Array.isArray(d.time)) throw new Error("format inattendu");
+    etape("meteopasse","Météo passée (92 jours)",async()=>{
+      const j=await getJSON(urlMeteoPasse(z),45000,sig); const d=j.daily; if(!d||!Array.isArray(d.time)) throw new Error("format inattendu");
       E.meteoPasse={jours:d.time.map((t,i)=>({date:t,pluie:d.precipitation_sum?.[i],tmax:d.temperature_2m_max?.[i],tmin:d.temperature_2m_min?.[i],code:d.weather_code?.[i]})).filter(x=>x.date<dateISO(new Date())),date:new Date().toISOString()};
       return `${E.meteoPasse.jours.length} jours`; }),
     etape("fiab","Précision météo mesurée (prévisions passées vs réel)",async()=>{
-      E.fiabMeteo=analyserFiabMeteo(await getJSON(urlFiabMeteo(z)));
+      E.fiabMeteo=analyserFiabMeteo(await getJSON(urlFiabMeteo(z),45000,sig));
       const e1=E.fiabMeteo.echeances[0]; return `à ${e1.echeance} j : écart moyen ${fmt(e1.maeT,1)} °C, pluie juste ${e1.justePluie??"?"} %`; }),
     etape("velo","Compteurs vélo mesurés",async()=>{
-      const c=await chargerComptage("velo",z); if(!c.serie.length){ E.comptages={...(E.comptages||{}),velo:null}; return "aucun compteur dans la zone (données disponibles à Paris uniquement)"; }
+      const c=await chargerComptage("velo",z,56,sig); if(!c.serie.length){ E.comptages={...(E.comptages||{}),velo:null}; return "aucun compteur dans la zone (données disponibles à Paris uniquement)"; }
       E.comptages={...(E.comptages||{}),velo:c}; return `${c.capteurs.length||"?"} compteur(s), ${c.serie.length} heures mesurées`; }),
     etape("trafic","Comptages routiers mesurés",async()=>{
-      const c=await chargerComptage("trafic",z,35); if(!c.serie.length){ E.comptages={...(E.comptages||{}),trafic:null}; return "aucun capteur dans la zone (données disponibles à Paris uniquement)"; }
+      const c=await chargerComptage("trafic",z,35,sig); if(!c.serie.length){ E.comptages={...(E.comptages||{}),trafic:null}; return "aucun capteur dans la zone (données disponibles à Paris uniquement)"; }
       E.comptages={...(E.comptages||{}),trafic:c}; return `${c.capteurs.length>=50?"50+":c.capteurs.length||"?"} capteur(s), ${c.serie.length} heures mesurées`; })
   ]);
   /* calage du moteur */
-  etatEnrich("cal","Calage du moteur : en cours…");
+  etapeUI("cal","Calage du moteur…","cours");
   const act=lieux.length?activite():null; E.calibration={};
   for(const cle of ["velo","trafic"]){ const c=E.comptages&&E.comptages[cle]; if(!c) continue;
     const cal=calibrer(c.serie,E.meteoPasse&&E.meteoPasse.jours,act); E.calibration[cle]=cal; }
   const cals=Object.entries(E.calibration).filter(([k,c])=>!c.erreur);
-  etatEnrich("cal","Calage du moteur : "+(cals.length?cals.map(([k,c])=>`${k==="velo"?"vélo":"trafic"} précision journalière ${fmt(100-c.eval.wapeJCal,0)} %`).join(" · "):"aucune mesure exploitable"),cals.length?"ok-t":"");
+  etapeUI("cal","Calage du moteur : "+(cals.length?cals.map(([k,c])=>`${k==="velo"?"vélo":"trafic"} précision journalière ${fmt(100-c.eval.wapeJCal,0)} %`).join(" · "):"aucune mesure exploitable, modèle type conservé"),cals.length?"ok":"info");
   /* suivi */
   suiviActuel=await lireSuivi(z.id);
   for(const [cle,cal] of cals) if(z.meteo) suiviActuel=majSuivi(suiviActuel,cle,cal,prevoirJours(cal,z.meteo.jours));
   await ecrireSuivi(z.id,suiviActuel);
   E.date=new Date().toISOString(); E.version=VERSION;
   log(`Enrichissement terminé : ${reussites}/5 sources réussies${cals.length?", moteur calé sur "+cals.length+" série(s) mesurée(s)":""}.`,reussites?"o":"w");
-  enrichEnCours=false; $("btnEnrich").disabled=false;
-  toutAfficher(false); await sauverEnrich();
+  toutAfficher(false); etapeUI("save","Enregistrement…","cours"); await sauverEnrich(); etapeUI("save",db?"Enregistré en mémoire":"Conservé le temps de la visite (exporte la zone pour la garder)","info");
+  }finally{ enrichEnCours=false; $("btnEnrich").disabled=false; chargeurFin(); }
 }
 async function sauverEnrich(){
   if(!db||!peutEcrire||!zone) return;
@@ -1306,7 +1412,7 @@ $("cpCarte").addEventListener("click",()=>copier("lnkCarte"));
 $("cpMeteo").addEventListener("click",()=>copier("lnkMeteo"));
 $("btnPrep").addEventListener("click",preparer);
 $("btnDirect").addEventListener("click",collecteDirecte);
-$("btnEnrich").addEventListener("click",enrichir);
+$("btnEnrich").addEventListener("click",()=>enrichir());
 $("btnExport").addEventListener("click",exporterZone);
 $("btnIntegrer").addEventListener("click",async()=>{ const t=$("taImport").value.trim(); if(!t){ log("Rien à intégrer : colle d'abord le résultat d'un lien.","w"); return; }
   $("btnIntegrer").disabled=true; try{ await traiterImport(t); $("taImport").value=""; } finally{ $("btnIntegrer").disabled=false; } });

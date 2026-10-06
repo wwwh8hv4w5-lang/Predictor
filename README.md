@@ -2,11 +2,11 @@
 
 Logiciel d'analyse de données et de prédiction sur un monde réel virtualisé, développé par **F.S.M Game House**.
 
-Version actuelle : **v0.7**
+Version actuelle : **v0.8**
 
 ## Ce que fait Predictor
 
-1. **Collecte** : carte OpenStreetMap d'une zone (collecte directe, Overpass Turbo, GeoJSON ou fichier régional `.osm.pbf` de Geofabrik) et prévisions météo Open-Meteo.
+1. **Collecte** : recherche de n'importe quel lieu dans le monde (ville, quartier, adresse), puis carte OpenStreetMap de la zone avec bascule automatique sur des serveurs de secours (collecte directe, Overpass Turbo, GeoJSON ou fichier régional `.osm.pbf` de Geofabrik) et prévisions météo Open-Meteo.
 2. **Enrichissement** : démographie INSEE (geo.api.gouv.fr), météo des 92 derniers jours, précision météo mesurée (prévisions passées comparées au réel), comptages réels vélo et trafic (open data Ville de Paris).
 3. **Monde virtualisé** : rues et lieux redessinés, classés en 9 familles.
 4. **Analyse** : densité, services essentiels, équipements publics, population, réseau de voies, lignes de transport (intervalles OSM ou estimés).
