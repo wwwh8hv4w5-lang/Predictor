@@ -6,7 +6,7 @@
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
 </head>
 <body>
-<title>Predictor v0.8</title>
+<title>Predictor v0.9</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
 <style>
@@ -94,6 +94,10 @@ td.num,th.num{text-align:right}
 .etape.info{color:var(--muted)} .etape.info .ic::before{content:"·"}
 .spin,.etape.cours .ic{width:12px;height:12px;flex:0 0 12px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:tourne .8s linear infinite;display:inline-block;vertical-align:-2px}
 @keyframes tourne{to{transform:rotate(360deg)}}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:3px;overflow:hidden}
+.seg button{border:0;border-radius:0;border-right:1px solid var(--line);background:var(--panel)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg)}
 body:has(#chargeur:not([hidden])) .wrap{padding-bottom:120px}
 #chargeur{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--panel);border-top:1px solid var(--accent);box-shadow:0 -4px 16px rgba(0,0,0,.25);padding:10px 16px calc(10px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:6px}
 #chargeur .ligne{display:flex;align-items:center;gap:10px;min-width:0}
@@ -122,7 +126,7 @@ details.rap .ia-out{margin-top:6px}
 
 <div class="wrap">
 <header>
-  <h1>PREDICTOR <small id="verTag">v0.8 · F.S.M Game House</small></h1>
+  <h1>PREDICTOR <small id="verTag">v0.9 · F.S.M Game House</small></h1>
   <div class="pills">
     <span class="pill" id="pillDb">Mémoire : …</span>
     <span class="pill" id="pillNet">Réseau direct : non testé</span>
@@ -184,6 +188,10 @@ details.rap .ia-out{margin-top:6px}
 
 <section aria-labelledby="hMonde">
   <h2 id="hMonde">2 · Monde virtualisé</h2>
+  <div class="row" role="group" aria-label="Fond de carte">
+    <div class="seg" id="segFond"><button data-fond="plan" aria-pressed="true">Plan</button><button data-fond="satellite" aria-pressed="false">Satellite</button><button data-fond="mixte" aria-pressed="false">Mixte</button></div>
+    <span class="small muted" id="fondInfo"></span>
+  </div>
   <div class="legend" id="legend"></div>
   <div class="canvas-box"><canvas id="cv" aria-label="Carte virtualisée de la zone"></canvas></div>
   <div class="row"><button id="zIn" aria-label="Zoomer">+</button><button id="zOut" aria-label="Dézoomer">−</button><button id="zFit">Recentrer</button><span class="small muted">Glisser pour se déplacer · pincer ou molette pour zoomer · toucher un point pour l'identifier</span></div>
@@ -232,7 +240,7 @@ details.rap .ia-out{margin-top:6px}
 <script>
 "use strict";
 /* ===================== Constantes ===================== */
-const VERSION = "0.8"; /* version unique du projet : incrémentée à chaque évolution */
+const VERSION = "0.9"; /* version unique du projet : incrémentée à chaque évolution */
 const VILLES = [
  ["Paris",48.8566,2.3522],["Lyon",45.7640,4.8357],["Marseille",43.2965,5.3698],["Toulouse",43.6047,1.4442],
  ["Nice",43.7102,7.2620],["Nantes",47.2184,-1.5536],["Strasbourg",48.5734,7.7521],["Montpellier",43.6108,3.8767],
@@ -1258,27 +1266,91 @@ let vue={x:0,y:0,s:1};
 function css(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
 function ajusterVue(){ const w=cv.clientWidth,h=cv.clientHeight; vue={x:0,y:0,s:zone?Math.min(w,h)/(zone.rayon*2.25):1}; }
 function versEcran(x,y){ return [cv.clientWidth/2+(x-vue.x)*vue.s, cv.clientHeight/2-(y-vue.y)*vue.s]; }
+/* ===================== Fond satellite (tuiles Web Mercator) ===================== */
+let fond="plan"; try{ const f=localStorage.getItem("predictor-fond"); if(["plan","satellite","mixte"].includes(f)) fond=f; }catch(e){}
+const tuiles=new Map(); let tuilesEchec=0, tuilesOk=0;
+const enFrance=(la,lo)=>la>41.2&&la<51.2&&lo>-5.5&&lo<9.8;
+function urlTuile(src,z,x,y){
+  return src==="ign"?`https://data.geopf.fr/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=ORTHOIMAGERY.ORTHOPHOTOS&STYLE=normal&TILEMATRIXSET=PM&TILEMATRIX=${z}&TILEROW=${y}&TILECOL=${x}&FORMAT=image/jpeg`
+    :`https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;
+}
+function tuile(z,x,y,src){
+  const k=z+"/"+x+"/"+y; let t=tuiles.get(k);
+  if(t) return t;
+  t={img:new Image(),ok:false,src}; tuiles.set(k,t);
+  t.img.decoding="async";
+  t.img.onload=()=>{ t.ok=true; tuilesOk++; redessiner(); };
+  t.img.onerror=()=>{ if(t.src==="ign"){ t.src="esri"; t.img.src=urlTuile("esri",z,x,y); } else { t.echec=true; tuilesEchec++; majFondInfo(); redessiner(); } };
+  t.img.src=urlTuile(src,z,x,y);
+  if(tuiles.size>500){ const k0=tuiles.keys().next().value; tuiles.delete(k0); }
+  return t;
+}
+const lon2x=(lo,n)=>(lo+180)/360*n, lat2y=(la,n)=>{ const r=la*Math.PI/180; return (1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2*n; };
+const x2lon=(x,n)=>x/n*360-180, y2lat=(y,n)=>{ const t=Math.PI*(1-2*y/n); return 180/Math.PI*Math.atan(Math.sinh(t)); };
+function versLatLon(px,py){ const c=Math.cos(zone.lat*Math.PI/180); const x=vue.x+(px-cv.clientWidth/2)/vue.s, y=vue.y-(py-cv.clientHeight/2)/vue.s;
+  return [zone.lat+y/110540, zone.lon+x/(111320*c)]; }
+function dessinerFond(w,h){
+  const dpr=window.devicePixelRatio||1, c=Math.cos(zone.lat*Math.PI/180);
+  const src=enFrance(zone.lat,zone.lon)?"ign":"esri", zMax=19;
+  let z=Math.ceil(Math.log2(156543.03*c*vue.s*dpr)); z=Math.max(3,Math.min(zMax,z));
+  let n, x0,x1,y0,y1;
+  for(;;){ n=2**z; const [laN,loW]=versLatLon(0,0), [laS,loE]=versLatLon(w,h);
+    x0=Math.floor(lon2x(loW,n)); x1=Math.floor(lon2x(loE,n)); y0=Math.floor(lat2y(laN,n)); y1=Math.floor(lat2y(laS,n));
+    if((x1-x0+1)*(y1-y0+1)<=64||z<=3) break; z--; }
+  ctx.imageSmoothingQuality="high";
+  for(let ty=y0;ty<=y1;ty++) for(let tx=x0;tx<=x1;tx++){
+    if(ty<0||ty>=n) continue; const txw=((tx%n)+n)%n;
+    const [ax,ay]=versEcran(...proj(y2lat(ty,n),x2lon(tx,n))), [bx,by]=versEcran(...proj(y2lat(ty+1,n),x2lon(tx+1,n)));
+    const t=tuile(z,txw,ty,src);
+    if(t.ok) ctx.drawImage(t.img,ax,ay,bx-ax+0.5,by-ay+0.5);
+    else { /* repli : tuile parente déjà chargée */
+      for(let d=1;d<=4;d++){ const k=(z-d)+"/"+(txw>>d)+"/"+(ty>>d), p=tuiles.get(k); if(p&&p.ok){ const f=2**d, sx=(txw%f)*256/f, sy=(ty%f)*256/f;
+        ctx.drawImage(p.img,sx,sy,256/f,256/f,ax,ay,bx-ax+0.5,by-ay+0.5); break; } } }
+  }
+  return src;
+}
+function majFondInfo(){
+  const el=$("fondInfo"); if(!el) return;
+  if(fond==="plan"){ el.textContent=""; return; }
+  if(tuilesEchec&&!tuilesOk) el.textContent="Images satellite indisponibles sur cet affichage (accès réseau nécessaire : version web GitHub).";
+  else el.textContent=zone&&enFrance(zone.lat,zone.lon)?"Photos aériennes IGN (Géoplateforme), relais Esri":"Images Esri World Imagery";
+}
 function dessiner(){
   const dpr=window.devicePixelRatio||1, w=cv.clientWidth, h=cv.clientHeight;
   if(cv.width!==Math.round(w*dpr)||cv.height!==Math.round(h*dpr)){ cv.width=Math.round(w*dpr); cv.height=Math.round(h*dpr); }
   ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,w,h);
   ctx.fillStyle=css("--bg"); ctx.fillRect(0,0,w,h);
   if(!zone){ ctx.fillStyle=css("--muted"); ctx.font="13px "+css("--font-ui"); ctx.textAlign="center"; ctx.fillText("Monde vide : aucune zone chargée",w/2,h/2); return; }
+  const sat=fond!=="plan"; let src=null;
+  if(sat){ src=dessinerFond(w,h); if(fond==="mixte"){ ctx.fillStyle="rgba(0,0,0,.18)"; ctx.fillRect(0,0,w,h); } }
   const [cx,cy]=versEcran(0,0);
-  ctx.strokeStyle=css("--ring"); ctx.setLineDash([5,5]); ctx.lineWidth=1; ctx.beginPath(); ctx.arc(cx,cy,zone.rayon*vue.s,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
-  const style={f:[css("--street-foot"),.8],l:[css("--street-local"),1.2],p:[css("--street-main"),2.4]};
-  for(const g of ["f","l","p"]){ ctx.strokeStyle=style[g][0]; ctx.lineWidth=Math.max(.5,style[g][1]*Math.min(2,Math.sqrt(vue.s*2))); ctx.beginPath();
-    for(const r of rues){ if(r.g!==g) continue; r.p.forEach((pt,i)=>{ const [x,y]=versEcran(...proj(pt[0],pt[1])); i?ctx.lineTo(x,y):ctx.moveTo(x,y); }); }
-    ctx.stroke(); }
+  ctx.strokeStyle=sat?"rgba(255,255,255,.9)":css("--ring"); ctx.setLineDash([5,5]); ctx.lineWidth=sat?1.5:1; ctx.beginPath(); ctx.arc(cx,cy,zone.rayon*vue.s,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]);
+  if(fond!=="satellite"){
+    const style=fond==="mixte"?{f:["rgba(255,255,255,.35)",.8],l:["rgba(255,255,255,.55)",1.2],p:["rgba(255,214,102,.85)",2.4]}:{f:[css("--street-foot"),.8],l:[css("--street-local"),1.2],p:[css("--street-main"),2.4]};
+    for(const g of ["f","l","p"]){ ctx.strokeStyle=style[g][0]; ctx.lineWidth=Math.max(.5,style[g][1]*Math.min(2,Math.sqrt(vue.s*2))); ctx.beginPath();
+      for(const r of rues){ if(r.g!==g) continue; r.p.forEach((pt,i)=>{ const [x,y]=versEcran(...proj(pt[0],pt[1])); i?ctx.lineTo(x,y):ctx.moveTo(x,y); }); }
+      ctx.stroke(); }
+  }
   const coul=Object.fromEntries(FAM_KEYS.map(k=>[k,css("--f-"+k)]));
-  const rad=Math.max(2,Math.min(5,vue.s*4));
+  const rad=Math.max(2,Math.min(5,vue.s*4))+(sat?0.5:0);
+  if(sat){ ctx.strokeStyle="rgba(255,255,255,.95)"; ctx.lineWidth=1.2; }
   for(const l of lieux){ if(!filtres[l.f]) continue; const [x,y]=versEcran(...proj(l.lat,l.lon));
-    if(x<-10||y<-10||x>w+10||y>h+10) continue; ctx.fillStyle=coul[l.f]; ctx.beginPath(); ctx.arc(x,y,rad,0,Math.PI*2); ctx.fill(); }
-  if(selection){ const [x,y]=versEcran(...proj(selection.lat,selection.lon)); ctx.strokeStyle=css("--fg"); ctx.lineWidth=2; ctx.beginPath(); ctx.arc(x,y,rad+5,0,Math.PI*2); ctx.stroke(); }
+    if(x<-10||y<-10||x>w+10||y>h+10) continue; ctx.fillStyle=coul[l.f]; ctx.beginPath(); ctx.arc(x,y,rad,0,Math.PI*2); ctx.fill(); if(sat) ctx.stroke(); }
+  if(selection){ const [x,y]=versEcran(...proj(selection.lat,selection.lon)); ctx.strokeStyle=sat?"#fff":css("--fg"); ctx.lineWidth=2; ctx.beginPath(); ctx.arc(x,y,rad+5,0,Math.PI*2); ctx.stroke(); }
   /* échelle */
-  const m=[50,100,200,500,1000].find(v=>v*vue.s>70)||1000; ctx.strokeStyle=css("--fg"); ctx.fillStyle=css("--fg"); ctx.lineWidth=2;
+  const m=[50,100,200,500,1000].find(v=>v*vue.s>70)||1000, coulTxt=sat?"#fff":css("--fg");
+  if(sat){ ctx.fillStyle="rgba(0,0,0,.55)"; ctx.fillRect(6,h-34,Math.max(60,m*vue.s+14),28); }
+  ctx.strokeStyle=coulTxt; ctx.fillStyle=coulTxt; ctx.lineWidth=2;
   ctx.beginPath(); ctx.moveTo(12,h-14); ctx.lineTo(12+m*vue.s,h-14); ctx.stroke(); ctx.font="11px "+css("--font-data"); ctx.textAlign="left"; ctx.fillText(m>=1000?m/1000+" km":m+" m",12,h-20);
+  if(sat){ const att=src==="ign"?"© IGN Géoplateforme":"© Esri, Maxar, Earthstar Geographics"; ctx.font="10px "+css("--font-ui"); const tw=ctx.measureText(att).width;
+    ctx.fillStyle="rgba(0,0,0,.55)"; ctx.fillRect(w-tw-12,h-18,tw+10,16); ctx.fillStyle="#fff"; ctx.textAlign="right"; ctx.fillText(att,w-7,h-6); }
 }
+function choisirFond(f){
+  fond=f; try{ localStorage.setItem("predictor-fond",f); }catch(e){}
+  document.querySelectorAll("#segFond button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.fond===f)));
+  majFondInfo(); redessiner(); log(`Fond de carte : ${f}.`);
+}
+$("segFond").addEventListener("click",e=>{ const b=e.target.closest("button[data-fond]"); if(b) choisirFond(b.dataset.fond); });
 let rafPending=false; function redessiner(){ if(rafPending) return; rafPending=true; requestAnimationFrame(()=>{rafPending=false;dessiner();}); }
 function zoomer(f,px,py){ const w=cv.clientWidth,h=cv.clientHeight; px??=w/2; py??=h/2;
   const wx=vue.x+(px-w/2)/vue.s, wy=vue.y-(py-h/2)/vue.s; vue.s=Math.max(.02,Math.min(40,vue.s*f));
@@ -1428,6 +1500,7 @@ $("inLat").value=VILLES[0][1]; $("inLon").value=VILLES[0][2]; $("inNom").value="
 new ResizeObserver(()=>redessiner()).observe(cv);
 window.matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change",redessiner);
 new MutationObserver(redessiner).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+document.querySelectorAll("#segFond button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.fond===fond))); majFondInfo();
 $("verTag").textContent=`v${VERSION} · F.S.M Game House`; document.title=`Predictor v${VERSION}`;
 log(`Predictor v${VERSION} démarré.`);
 toutAfficher(false);
