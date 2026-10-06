@@ -6,7 +6,7 @@
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
 </head>
 <body>
-<title>Predictor v1.3</title>
+<title>Predictor v1.5</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;600&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
 <style>
@@ -105,6 +105,12 @@ table.wrapt td.num{white-space:nowrap}
 .etape.info{color:var(--muted)} .etape.info .ic::before{content:"·"}
 .spin,.etape.cours .ic{width:12px;height:12px;flex:0 0 12px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:tourne .8s linear infinite;display:inline-block;vertical-align:-2px}
 @keyframes tourne{to{transform:rotate(360deg)}}
+.maj{position:sticky;top:env(safe-area-inset-top,0px);z-index:25;display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;background:var(--accent);color:var(--accent-fg);padding:10px 16px}
+.maj button{background:var(--accent-fg);color:var(--accent);border-color:var(--accent-fg)}
+.ico-tri{display:inline-flex;align-items:center;justify-content:center;width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-bottom:14px solid #dc2626;position:relative;font-size:0}
+.ico-tri::after{content:"!";position:absolute;top:2px;left:-2px;font:bold 9px/1 var(--font-ui);color:#fff}
+.ico-acc{display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;border-radius:50%;background:#1f2937;border:1.5px solid #fff;color:#fff;font:bold 11px/1 var(--font-ui);box-shadow:0 0 0 1px #1f2937}
+.leg-risque{border-color:var(--bad)!important}
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:3px;overflow:hidden}
 .seg button{border:0;border-radius:0;border-right:1px solid var(--line);background:var(--panel)}
 .seg button:last-child{border-right:0}
@@ -138,7 +144,7 @@ details.rap .ia-out{margin-top:6px}
 
 <div class="wrap">
 <header>
-  <h1>PREDICTOR <small id="verTag">v1.3 · F.S.M Game House</small></h1>
+  <h1>PREDICTOR <small id="verTag">v1.5 · F.S.M Game House</small></h1>
   <div class="pills">
     <span class="pill" id="pillDb">Mémoire : …</span>
     <span class="pill" id="pillNet">Réseau direct : non testé</span>
@@ -147,6 +153,7 @@ details.rap .ia-out{margin-top:6px}
   </div>
 </header>
 
+<div id="majBandeau" class="maj" role="status" hidden><span id="majTxt"></span><button class="primary" id="majBtn">Mettre à jour</button></div>
 <div id="chargeur" role="status" aria-live="polite" hidden>
   <div class="ligne"><span class="spin" aria-hidden="true"></span><div class="txt"><b id="chTitre">Chargement…</b><span id="chEtape"></span></div><span id="chTemps">0 s</span><button id="chStop">Arrêter</button></div>
   <div class="barre-ind" aria-hidden="true"></div>
@@ -215,7 +222,7 @@ details.rap .ia-out{margin-top:6px}
   <div class="canvas-box"><canvas id="cv" aria-label="Carte virtualisée de la zone"></canvas></div>
   <div class="row"><button id="zIn" aria-label="Zoomer">+</button><button id="zOut" aria-label="Dézoomer">−</button><button id="zFit">Recentrer</button><span class="small muted">Glisser pour se déplacer · pincer ou molette pour zoomer · toucher un point pour l'identifier</span></div>
   <div class="info" id="info">Aucune zone chargée. Prépare une collecte ou ouvre une zone en mémoire.</div>
-  <div class="small muted" id="legendeDanger" hidden>Couche danger : plus le rouge est intense, plus la probabilité relative d'incident est élevée. Losanges : événements Actu17 (rouge grave, orange moyen, jaune faible).</div>
+  <div class="small muted" id="legendeDanger" hidden>Triangles rouges : les 3 lieux les plus à risque ; orange : les suivants ; le numéro donne le rang. Cercles barrés d'une croix : accidents réels (violet foncé = de nuit). Couche danger : plus le rouge est intense, plus la probabilité relative d'incident est élevée. Losanges : événements Actu17 (rouge grave, orange moyen, jaune faible).</div>
 </section>
 
 <section aria-labelledby="hAna">
@@ -269,7 +276,7 @@ details.rap .ia-out{margin-top:6px}
 <script>
 "use strict";
 /* ===================== Constantes ===================== */
-const VERSION = "1.3"; /* version unique du projet : incrémentée à chaque évolution */
+const VERSION = "1.5"; /* version unique du projet : incrémentée à chaque évolution */
 const VILLES = [
  ["Paris",48.8566,2.3522],["Lyon",45.7640,4.8357],["Marseille",43.2965,5.3698],["Toulouse",43.6047,1.4442],
  ["Nice",43.7102,7.2620],["Nantes",47.2184,-1.5536],["Strasbourg",48.5734,7.7521],["Montpellier",43.6108,3.8767],
@@ -1885,6 +1892,15 @@ function dessiner(){
   if(sat){ ctx.strokeStyle="rgba(255,255,255,.95)"; ctx.lineWidth=1.2; }
   for(const l of lieux){ if(!filtres[l.f]) continue; const [x,y]=versEcran(...proj(l.lat,l.lon));
     if(x<-10||y<-10||x>w+10||y>h+10) continue; ctx.fillStyle=coul[l.f]; ctx.beginPath(); ctx.arc(x,y,rad,0,Math.PI*2); ctx.fill(); if(sat) ctx.stroke(); }
+  if(iconesAcc&&zone.enrich&&zone.enrich.accidents){ const r0=Math.max(3,Math.min(5.5,vue.s*5));
+    for(const a of zone.enrich.accidents.points){ const [x,y]=versEcran(...proj(a[0],a[1])); if(x<-8||y<-8||x>w+8||y>h+8) continue;
+      ctx.fillStyle=(NUIT(a[4])||a[5]>=3)?"#312e81":"#1f2937"; ctx.strokeStyle="#fff"; ctx.lineWidth=1.3; ctx.beginPath(); ctx.arc(x,y,r0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x-r0*0.55,y); ctx.lineTo(x+r0*0.55,y); ctx.moveTo(x,y-r0*0.55); ctx.lineTo(x,y+r0*0.55); ctx.stroke(); } }
+  if(iconesRisque){ const d=danger(); if(d) d.chauds.forEach((hh,i)=>{ const [x,y]=versEcran(...proj(hh.lat,hh.lon)); const t=i<3?15:12;
+      ctx.fillStyle=i<3?"#dc2626":"#ea7a1a"; ctx.strokeStyle="#fff"; ctx.lineWidth=2; ctx.lineJoin="round";
+      ctx.beginPath(); ctx.moveTo(x,y-t); ctx.lineTo(x+t*0.95,y+t*0.65); ctx.lineTo(x-t*0.95,y+t*0.65); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle="#fff"; ctx.font=`bold ${i<3?12:10}px `+css("--font-ui"); ctx.textAlign="center"; ctx.fillText("!",x,y+t*0.45);
+      ctx.fillStyle="rgba(0,0,0,.75)"; ctx.beginPath(); ctx.arc(x+t*0.9,y-t*0.7,7.5,0,Math.PI*2); ctx.fill(); ctx.fillStyle="#fff"; ctx.font="bold 10px "+css("--font-data"); ctx.fillText(String(i+1),x+t*0.9,y-t*0.7+3.5); }); }
   if(coucheEvt){ for(const e of evenementsZone(zone)){ if(!isFinite(e.lat)) continue; const [x,y]=versEcran(...proj(e.lat,e.lon)), s2=e.precision==="rue"?7:5;
       ctx.fillStyle=e.gravite>=4?"#dc2626":e.gravite>=3?"#ea7a1a":"#e3b505"; ctx.strokeStyle="#fff"; ctx.lineWidth=1.5;
       ctx.beginPath(); ctx.moveTo(x,y-s2); ctx.lineTo(x+s2,y); ctx.lineTo(x,y+s2); ctx.lineTo(x-s2,y); ctx.closePath(); ctx.fill(); ctx.stroke(); } }
@@ -1921,17 +1937,20 @@ function choisir(px,py){
   if(!zone) return; let best=null,bd=16;
   if(coucheEvt){ let be=null, de=14; for(const e of evenementsZone(zone)){ if(!isFinite(e.lat)) continue; const [x,y]=versEcran(...proj(e.lat,e.lon)), d=Math.hypot(x-px,y-py); if(d<de){ de=d; be=e; } }
     if(be){ selection=null; redessiner(); $("info").innerHTML=`<b>${esc(be.typeLib)}</b> · ${new Date(be.date).toLocaleDateString("fr-FR")} · ${esc(be.lieu||"")} (${be.precision})<br><a href="${esc(be.lien)}" target="_blank" rel="noopener">${esc(be.titre)}</a>`; return; } }
-  if(coucheDanger){ const d=danger(); if(d){ const i=d.chauds.findIndex(hh=>{ const [x,y]=versEcran(...proj(hh.lat,hh.lon)); return Math.hypot(x-px,y-py)<12; });
-    if(i>=0){ const hh=d.chauds[i]; $("info").innerHTML=`<b>Secteur dangereux n° ${i+1}</b> · ${esc(hh.rue||"sans nom")} · ${fmt(hh.part,1)} % du risque de la zone (× ${fmt(hh.ratio,1)} la moyenne) · ${hh.nAcc} accident(s), ${hh.nEv} événement(s)`; return; } } }
+  if(coucheDanger||iconesRisque){ const d=danger(); if(d){ const i=d.chauds.findIndex(hh=>{ const [x,y]=versEcran(...proj(hh.lat,hh.lon)); return Math.hypot(x-px,y-py)<16; });
+    if(i>=0){ const hh=d.chauds[i], cause=hh.contrib.accidents>=50?"surtout des accidents de la route":hh.contrib.evenements>=40?"surtout des faits récents rapportés par la presse":"forte fréquentation (lieux de nuit, gare, grand axe)";
+      $("info").innerHTML=`<b>⚠ Lieu à risque n° ${i+1}</b> · ${esc(hh.rue||"secteur sans nom")}<br>${fmt(hh.part,1)} % du risque de la zone, ${fmt(hh.ratio,1)} fois la moyenne · ${cause}<br><span class="small muted">${[hh.nAcc?hh.nAcc+" accident(s) à proximité":"",hh.nEv?hh.nEv+" fait(s) rapporté(s)":"",hh.nuitLieux?hh.nuitLieux+" lieu(x) de nuit":""].filter(Boolean).join(" · ")||"facteurs de terrain"}</span>`; return; } } }
+  if(iconesAcc&&zone.enrich&&zone.enrich.accidents){ let ba=null, da=10; for(const a of zone.enrich.accidents.points){ const [x,y]=versEcran(...proj(a[0],a[1])), dd=Math.hypot(x-px,y-py); if(dd<da){ da=dd; ba=a; } }
+    if(ba){ const nuit=NUIT(ba[4])||ba[5]>=3; $("info").innerHTML=`<b>Accident corporel</b> · ${String(ba[3]).padStart(2,"0")}/${ba[2]}${ba[4]!=null?" · vers "+ba[4]+" h":""} · ${nuit?"de nuit":"de jour"} (${LUM[ba[5]]||"luminosité inconnue"})${ba[6]>1?" · à une intersection":""}${ba[7]?" · "+esc(ba[7]):""}<br><span class="small muted">Source : base officielle des accidents corporels (BAAC)</span>`; return; } }
   for(const l of lieux){ if(!filtres[l.f]) continue; const [x,y]=versEcran(...proj(l.lat,l.lon)); const d=Math.hypot(x-px,y-py); if(d<bd){bd=d;best=l;} }
   selection=best; redessiner();
-  if(!best){ $("info").textContent=FAM_KEYS.some(k=>filtres[k])?"Aucun lieu à cet endroit.":"Aucun icône affiché : coche une famille de lieux ou active une couche."; return; }
+  if(!best){ $("info").textContent=FAM_KEYS.some(k=>filtres[k])||iconesRisque||iconesAcc?"Rien à cet endroit : touche un icône.":"Aucun icône affiché : coche « Lieux à risque », une famille de lieux ou active une couche."; return; }
   let etat="";
   const now=new Date(), j=(now.getDay()+6)%7;
   etat= ouvert(best,j,now.getHours())? (best._oh?"ouvert maintenant (horaires déclarés)":"probablement ouvert (horaires présumés)") : (best._oh?"fermé maintenant (horaires déclarés)":"probablement fermé (horaires présumés)");
   $("info").innerHTML=`<b>${esc(best.n||"Sans nom")}</b> · ${esc(nomType(best.t))} · ${FAMILLES[best.f]} · ${etat}${best.oh?` · <span class="muted">${esc(best.oh)}</span>`:""}`;
 }
-function majCouches(){ $("btnCoucheDanger").setAttribute("aria-pressed",String(coucheDanger)); $("btnCoucheEvt").setAttribute("aria-pressed",String(coucheEvt)); $("legendeDanger").hidden=!(coucheDanger||coucheEvt); redessiner(); }
+function majCouches(){ $("btnCoucheDanger").setAttribute("aria-pressed",String(coucheDanger)); $("btnCoucheEvt").setAttribute("aria-pressed",String(coucheEvt)); $("legendeDanger").hidden=!(coucheDanger||coucheEvt||iconesRisque||iconesAcc); redessiner(); }
 $("btnCoucheDanger").addEventListener("click",()=>{ coucheDanger=!coucheDanger; majCouches(); rendrePredictions(); });
 $("btnCoucheEvt").addEventListener("click",()=>{ coucheEvt=!coucheEvt; majCouches(); if(coucheEvt&&!evenements.length) log("Aucun événement chargé : utilise « Charger l'actualité ».","w"); });
 $("btnTousLieux").addEventListener("click",()=>{ FAM_KEYS.forEach(k=>filtres[k]=true); rendreLegende(); redessiner(); });
@@ -1939,9 +1958,15 @@ $("btnAucunLieu").addEventListener("click",()=>{ FAM_KEYS.forEach(k=>filtres[k]=
 $("btnActu").addEventListener("click",chargerActualite);
 $("pred").addEventListener("click",e=>{ const p=e.target.closest("button[data-periode]"); if(p){ periodeDanger=p.dataset.periode; rendrePredictions(); redessiner(); return; }
   if(e.target.closest("#btnCoucheDanger2")||e.target.closest("#btnSynCarte")){ coucheDanger=!coucheDanger; majCouches(); rendrePredictions(); if(coucheDanger) document.getElementById("hMonde")?.scrollIntoView?.({behavior:"smooth"}); } });
+let iconesRisque=false, iconesAcc=false;
 function rendreLegende(){
-  $("legend").innerHTML=FAM_KEYS.map(k=>`<label><input type="checkbox" id="flt-${k}" ${filtres[k]?"checked":""}><span class="sw" style="background:var(--f-${k})"></span>${FAMILLES[k]}${zone&&zone.stats?` (${zone.stats.parFamille[k]||0})`:""}</label>`).join("");
+  const d=zone?danger():null, nAcc=zone&&zone.enrich&&zone.enrich.accidents?zone.enrich.accidents.points.length:0;
+  $("legend").innerHTML=`<label class="leg-risque"><input type="checkbox" id="flt-risque" ${iconesRisque?"checked":""}><span class="ico-tri" aria-hidden="true">!</span>Lieux à risque${d?` (${d.chauds.length})`:""}</label>`
+    +`<label class="leg-risque"><input type="checkbox" id="flt-acc" ${iconesAcc?"checked":""}><span class="ico-acc" aria-hidden="true">+</span>Accidents 2022-2024 (${nAcc})</label>`
+    +FAM_KEYS.map(k=>`<label><input type="checkbox" id="flt-${k}" ${filtres[k]?"checked":""}><span class="sw" style="background:var(--f-${k})"></span>${FAMILLES[k]}${zone&&zone.stats?` (${zone.stats.parFamille[k]||0})`:""}</label>`).join("");
   FAM_KEYS.forEach(k=>$("flt-"+k).addEventListener("change",e=>{filtres[k]=e.target.checked;redessiner();}));
+  $("flt-risque").addEventListener("change",e=>{ iconesRisque=e.target.checked; $("legendeDanger").hidden=!(coucheDanger||coucheEvt||iconesRisque||iconesAcc); if(iconesRisque&&!(d&&d.chauds.length)) $("info").textContent="Aucun lieu à risque calculé : charge d'abord une zone (les accidents réels arrivent avec l'enrichissement)."; redessiner(); });
+  $("flt-acc").addEventListener("change",e=>{ iconesAcc=e.target.checked; $("legendeDanger").hidden=!(coucheDanger||coucheEvt||iconesRisque||iconesAcc); if(iconesAcc&&!nAcc) $("info").textContent="Aucun accident chargé pour cette zone : lance « Enrichir la zone »."; redessiner(); });
 }
 
 function toutAfficher(recadrer){
@@ -2067,6 +2092,19 @@ new MutationObserver(redessiner).observe(document.documentElement,{attributes:tr
 document.querySelectorAll("#segFond button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.fond===fond))); majFondInfo();
 $("verTag").textContent=`v${VERSION} · F.S.M Game House`; document.title=`Predictor v${VERSION}`;
 log(`Predictor v${VERSION} démarré.`);
+/* Vérification de mise à jour : compare avec la version publiée (hors Claude) */
+const cmpVer=(a,b)=>{ const x=String(a).split(".").map(Number), y=String(b).split(".").map(Number); for(let i=0;i<Math.max(x.length,y.length);i++){ const d=(x[i]||0)-(y[i]||0); if(d) return d; } return 0; };
+async function verifierMiseAJour(){
+  if(window.claude||!/^https?:$/.test(location.protocol)) return;
+  try{ const r=await fetch(location.pathname+"?maj="+Date.now(),{cache:"no-store"}); if(!r.ok) return;
+    const m=(await r.text()).match(/const VERSION = "([\d.]+)"/); if(!m||cmpVer(m[1],VERSION)<=0) return;
+    $("majTxt").textContent=`Nouvelle version v${m[1]} disponible (tu utilises v${VERSION}).`; $("majBandeau").hidden=false;
+    log(`Nouvelle version v${m[1]} publiée : touche « Mettre à jour ».`,"w");
+  }catch(e){}
+}
+$("majBtn").addEventListener("click",()=>{ location.replace(location.pathname+"?v="+Date.now()); });
+setTimeout(verifierMiseAJour,1500); setInterval(verifierMiseAJour,15*60000);
+document.addEventListener("visibilitychange",()=>{ if(!document.hidden) verifierMiseAJour(); });
 toutAfficher(false);
 testerReseau();
 
