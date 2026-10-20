@@ -15,7 +15,7 @@ Predictor est un appui pour toute personne qui arrive dans une ville ou un villa
 3. **Monde virtualisé** : rues et lieux redessinés, classés en 9 familles, sur fond Plan, Satellite ou Mixte (photos aériennes IGN en France, Esri World Imagery ailleurs).
 4. **Analyse** : densité, services essentiels, équipements publics, population, réseau de voies, lignes de transport (intervalles OSM ou estimés).
 5. **Danger probable** : probabilité relative d'incidents par secteur (accidents de la route BAAC 2022-2024 géolocalisés, événements Actu17 localisés, facteurs de terrain), jour ou nuit, avec contrôle sur les accidents de 2024 ; délinquance enregistrée de la commune (SSMSI).
-6. **Événements en cours** : Actu17, flux RSS de `data/sources.txt` et titres de toute la presse française via GDELT ; regroupement des articles qui décrivent le même fait, classement par type et gravité, localisation à la rue ou à la commune (geo.api.gouv.fr, Base Adresse Nationale), affichage sur la carte. Aucun nom de personne n'est relevé.
+6. **Événements en cours** : Actu17, flux RSS des sources ajoutées (voir « Robot presse ») et titres de toute la presse française via GDELT ; regroupement des articles qui décrivent le même fait, classement par type et gravité, localisation à la rue ou à la commune (geo.api.gouv.fr, Base Adresse Nationale), affichage sur la carte. Aucun nom de personne n'est relevé.
 7. **Prédictions** : météo 7 jours avec fiabilité mesurée, fréquentation par heure et par jour, modèle calé sur mesures réelles et testé sur des jours qu'il n'a jamais vus, effet mesuré de la pluie, suivi de la précision des prévisions dans le temps.
 8. **Mémoire en ligne** et **agent Claude** : disponibles quand Predictor est ouvert dans Claude. La version web exporte des paquets de zone que la version Claude importe.
 
@@ -23,9 +23,9 @@ Predictor est un appui pour toute personne qui arrive dans une ville ou un villa
 
 Ouvrir la page web, taper une adresse précise ou un lieu, puis « Charger la zone » : Predictor localise l'adresse et télécharge automatiquement la carte, la météo et les données réelles. Les prédictions s'affichent d'abord en bref, en phrases simples avec leur fiabilité, puis en détail. Hors de Claude, la mémoire en ligne et l'agent Claude sont désactivés ; le suivi de précision est conservé sur l'appareil.
 
-## Robot presse
+## Robot presse (facultatif)
 
-Le fichier `.github/workflows/actu17.yml` recopie toutes les heures les flux listés dans `data/sources.txt` (une ligne par source : `identifiant|Nom|adresse`), car ces sites n'autorisent pas la lecture directe depuis une autre page web. Predictor lit ces copies automatiquement.
+La plupart des sites de presse n'autorisent pas la lecture directe depuis une page web (CORS). Predictor gère ce cas en deux temps : il essaie d'abord la lecture directe de chaque flux, puis des copies statiques hébergées dans son dépôt (`data/flux-identifiant.xml`). Ces copies sont produites par un **robot horaire non inclus dans ce dépôt** : pour l'activer sur votre propre dépôt, ajoutez `data/sources.txt` (une ligne par source : `identifiant|Nom|adresse du flux`) et un workflow GitHub Actions qui recopie les flux chaque heure. Sans ce robot, Predictor lit quand même sa liste intégrée (Actu17) et les événements viennent surtout de GDELT, qui n'a pas besoin de robot.
 
 ## Sources de données
 
